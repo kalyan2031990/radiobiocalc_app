@@ -22,14 +22,24 @@ const env = {
   androidPackage: bundleId,
 };
 
-const isPilotBuild = process.env.EXPO_PUBLIC_PILOT_BUILD === "1";
+const isOfflineBuild = process.env.EXPO_PUBLIC_OFFLINE_BUILD === "1";
+const isPilotBuild =
+  !isOfflineBuild && process.env.EXPO_PUBLIC_PILOT_BUILD === "1";
 
 const config: ExpoConfig = {
-  name: isPilotBuild ? "rbGyanX Pilot" : env.appName,
+  name: isOfflineBuild
+    ? "rbGyanX Mobile"
+    : isPilotBuild
+      ? "rbGyanX Pilot"
+      : env.appName,
   slug: env.appSlug,
-  version: "2.0.0",
+  version: "2.1.0",
   extra: {
+    offlineBuild: isOfflineBuild,
     pilotBuild: isPilotBuild,
+    eas: {
+      projectId: "956761c0-431c-4624-bbed-6381ab7e4516",
+    },
   },
   description: "Knowledge-guided clinical decision support system (CDSS) framework for radiation oncology. Calculates TCP/NTCP, BED, EQD2, EUD using traditional radiobiological models with QUANTEC/RTOG parameters. Supports single-patient and cohort outcome evaluation. Privacy-first with offline-capable calculations.",
   orientation: "portrait",
@@ -42,7 +52,9 @@ const config: ExpoConfig = {
     bundleIdentifier: env.iosBundleId,
   },
   android: {
-    versionCode: 2,
+    versionCode: 6,
+    /** Pilot LAN API uses http:// — required for phone → PC on Wi‑Fi */
+    usesCleartextTraffic: true,
     adaptiveIcon: {
       backgroundColor: "#E8EEF4",
       foregroundImage: "./assets/images/android-icon-foreground.png",

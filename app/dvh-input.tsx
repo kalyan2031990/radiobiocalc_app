@@ -23,6 +23,8 @@ import { saveDvhSession } from "@/lib/dvh-session";
 import type { ParsedDvhBundle } from "@/lib/plan-evaluation";
 import { mergeDvhBundles } from "@/lib/merge-dvh-bundle";
 import { analyzePlanScope } from "@/lib/plan-scope";
+import { isOfflineBuild } from "@/lib/offline-mode";
+import { offlineMergeDvhs, offlineParseDvh } from "@/lib/offline-engine";
 
 async function readDocumentContent(
   asset: DocumentPicker.DocumentPickerAsset,
@@ -78,39 +80,47 @@ export default function DVHInputScreen() {
 
       for (const asset of assets) {
         const content = await readDocumentContent(asset);
-        const result = await parseMutation.mutateAsync({
-          content,
-          fileName: asset.name,
-        });
+        if (isOfflineBuild()) {
+          parsedBundles.push(offlineParseDvh(content, asset.name));
+        } else {
+          const result = await parseMutation.mutateAsync({
+            content,
+            fileName: asset.name,
+          });
 
-        if (!result.success || !result.data) {
-          Alert.alert("Parse error", result.error ?? `Could not parse ${asset.name}`);
-          return;
+          if (!result.success || !result.data) {
+            Alert.alert("Parse error", result.error ?? `Could not parse ${asset.name}`);
+            return;
+          }
+
+          parsedBundles.push(result.data as ParsedDvhBundle);
+          if ("sessionId" in result && typeof result.sessionId === "string") {
+            sessionIds.push(result.sessionId);
+          }
         }
-
-        parsedBundles.push(result.data as ParsedDvhBundle);
         fileNames.push(asset.name);
-        if ("sessionId" in result && typeof result.sessionId === "string") {
-          sessionIds.push(result.sessionId);
-        }
       }
 
       let data =
         parsedBundles.length === 1
           ? parsedBundles[0]
-          : mergeDvhBundles(parsedBundles, fileNames);
+          : isOfflineBuild()
+            ? offlineMergeDvhs(parsedBundles)
+            : mergeDvhBundles(parsedBundles, fileNames);
 
       let serverId: string | null = null;
-      if (sessionIds.length > 1) {
-        const merged = await mergeSessionsMutation.mutateAsync({
-          sessionIds,
-        });
-        if (merged.success && merged.data) {
-          data = merged.data as ParsedDvhBundle;
-          serverId = merged.sessionId ?? null;
+      if (!isOfflineBuild()) {
+        if (sessionIds.length > 1) {
+          const merged = await mergeSessionsMutation.mutateAsync({
+            sessionIds,
+          });
+          if (merged.success && merged.data) {
+            data = merged.data as ParsedDvhBundle;
+            serverId = merged.sessionId ?? null;
+          }
+        } else if (sessionIds.length === 1) {
+          serverId = sessionIds[0];
         }
-      } else if (sessionIds.length === 1) {
-        serverId = sessionIds[0];
       }
 
       setDVHData(data);
@@ -127,7 +137,9 @@ export default function DVHInputScreen() {
       const msg = error instanceof Error ? error.message : "Unknown error";
       Alert.alert(
         "Error",
-        `Failed to load DVH. Is the API running at ${getApiBaseUrl()}?\n\n${msg}`,
+        isOfflineBuild()
+          ? `Failed to parse DVH on device.\n\n${msg}`
+          : `Failed to load DVH. Is the API running at ${getApiBaseUrl()}?\n\n${msg}`,
       );
       console.error(error);
     } finally {

@@ -11,6 +11,13 @@ import { AppVersionBadge } from "@/components/app-version-badge";
 import { cn } from "@/lib/utils";
 import { useColors } from "@/hooks/use-colors";
 import { APP_TAGLINE } from "@/lib/app-meta";
+import {
+  isOfflineBuild,
+  isExportServerConfigured,
+  OFFLINE_MODE_LABEL,
+  OFFLINE_EXPORT_HINT,
+} from "@/lib/offline-mode";
+import { useApiClient } from "@/lib/api-client-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -28,6 +35,7 @@ interface RecentCalculation {
 export default function HomeScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { apiBaseUrl } = useApiClient();
   const [recentCalculations, setRecentCalculations] = useState<
     RecentCalculation[]
   >([]);
@@ -82,23 +90,57 @@ export default function HomeScreen() {
                 Product, validation & roadmap
               </Text>
             </Pressable>
-            <Pressable
-              onPress={() => router.push("/pilot-api-setup")}
-              className="mt-1"
-            >
-              <View
-                className="rounded-lg px-4 py-3 flex-row items-center justify-between"
-                style={{ backgroundColor: "#DBEAFE", borderWidth: 1, borderColor: "#93C5FD" }}
-              >
-                <View className="flex-row items-center gap-2 flex-1">
-                  <MaterialIcons name="dns" size={22} color="#1D4ED8" />
-                  <Text style={{ color: "#1E3A8A", fontWeight: "600", fontSize: 13 }}>
-                    Pilot: set API server URL
+            {isOfflineBuild() ? (
+              <View className="gap-2 mt-1 w-full px-0">
+                <View
+                  className="rounded-lg px-4 py-3"
+                  style={{ backgroundColor: "#D1FAE5", borderWidth: 1, borderColor: "#6EE7B7" }}
+                >
+                  <Text style={{ color: "#065F46", fontWeight: "600", fontSize: 13 }}>
+                    {OFFLINE_MODE_LABEL}
                   </Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={22} color="#1D4ED8" />
+                <Pressable onPress={() => router.push("/pilot-api-setup")}>
+                  <View
+                    className="rounded-lg px-4 py-3"
+                    style={{ backgroundColor: "#DBEAFE", borderWidth: 1, borderColor: "#93C5FD" }}
+                  >
+                    <View className="flex-row items-center justify-between gap-2">
+                      <View className="flex-row items-center gap-2 flex-1">
+                        <MaterialIcons name="cloud-upload" size={22} color="#1D4ED8" />
+                        <Text style={{ color: "#1E3A8A", fontWeight: "600", fontSize: 13, flex: 1 }}>
+                          Report export server (PDF/DOCX)
+                        </Text>
+                      </View>
+                      <MaterialIcons name="chevron-right" size={22} color="#1D4ED8" />
+                    </View>
+                    <Text style={{ color: "#1E40AF", fontSize: 11, marginTop: 6 }}>
+                      {isExportServerConfigured()
+                        ? `Active: ${apiBaseUrl}`
+                        : OFFLINE_EXPORT_HINT}
+                    </Text>
+                  </View>
+                </Pressable>
               </View>
-            </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => router.push("/pilot-api-setup")}
+                className="mt-1"
+              >
+                <View
+                  className="rounded-lg px-4 py-3 flex-row items-center justify-between"
+                  style={{ backgroundColor: "#DBEAFE", borderWidth: 1, borderColor: "#93C5FD" }}
+                >
+                  <View className="flex-row items-center gap-2 flex-1">
+                    <MaterialIcons name="dns" size={22} color="#1D4ED8" />
+                    <Text style={{ color: "#1E3A8A", fontWeight: "600", fontSize: 13 }}>
+                      Pilot: set API server URL
+                    </Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={22} color="#1D4ED8" />
+                </View>
+              </Pressable>
+            )}
           </View>
 
           <View className="gap-4 px-4">

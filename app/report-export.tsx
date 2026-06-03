@@ -19,6 +19,15 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import * as FileSystem from "expo-file-system/legacy";
 import { trpc } from "@/lib/trpc";
+import { getApiBaseUrl } from "@/constants/oauth";
+import { isOfflineBuild } from "@/lib/offline-mode";
+
+function exportServerRequiredMessage(): string {
+  return (
+    "Set the report export server on Home (PDF/DOCX only). " +
+    "For remote phones use an https ngrok URL to your PC running npm run start:server."
+  );
+}
 
 export default function ReportExportScreen() {
   const router = useRouter();
@@ -59,7 +68,19 @@ export default function ReportExportScreen() {
     };
   };
 
+  const ensureExportServer = (): boolean => {
+    if (isOfflineBuild() && !getApiBaseUrl()) {
+      Alert.alert("Export server required", exportServerRequiredMessage(), [
+        { text: "Cancel", style: "cancel" },
+        { text: "Open settings", onPress: () => router.push("/pilot-api-setup") },
+      ]);
+      return false;
+    }
+    return true;
+  };
+
   const handleGenerate = async () => {
+    if (!ensureExportServer()) return null;
     try {
       const res = await generateMutation.mutateAsync(buildPayload());
       if (!res.success || !res.data) {
@@ -97,6 +118,7 @@ export default function ReportExportScreen() {
   };
 
   const handlePdf = async () => {
+    if (!ensureExportServer()) return;
     const data = lastHtml
       ? { html: lastHtml, docxText: lastDocx ?? "", filenameBase }
       : await handleGenerate();
@@ -119,6 +141,7 @@ export default function ReportExportScreen() {
   };
 
   const handleDocx = async () => {
+    if (!ensureExportServer()) return;
     const res = await generateMutation.mutateAsync(buildPayload());
     if (!res.success || !res.data) {
       Alert.alert("Report", res.error ?? "Generation failed");
@@ -164,7 +187,24 @@ export default function ReportExportScreen() {
         </Text>
         <Text style={{ color: colors.muted }}>
           Includes TCP/NTCP, QUANTEC-oriented metrics, and literature references (Gyan layer).
+          {isOfflineBuild()
+            ? " Mobile build: calculations are on-device; report generation uses your export server only."
+            : ""}
         </Text>
+        {isOfflineBuild() && !getApiBaseUrl() ? (
+          <Pressable
+            onPress={() => router.push("/pilot-api-setup")}
+            style={{
+              backgroundColor: "#FEF3C7",
+              padding: 12,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: "#FCD34D",
+            }}
+          >
+            <Text style={{ color: "#92400E", fontSize: 13 }}>{exportServerRequiredMessage()}</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           onPress={handleGenerate}

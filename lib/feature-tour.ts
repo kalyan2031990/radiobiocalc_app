@@ -15,6 +15,9 @@ import {
 import { EMPTY_CLINICAL } from "@/lib/clinical-context";
 import type { CompositePlanEvaluation } from "@/lib/composite-plan-types";
 import { getApiBaseUrl } from "@/constants/oauth";
+import { appFetch } from "@/lib/api-fetch";
+import { isOfflineBuild } from "@/lib/offline-mode";
+import { offlineEvaluateComposite, offlineParseDvh } from "@/lib/offline-engine";
 
 const DISCLAIMER_KEY = "@rbgyanx_disclaimer_accepted";
 const DEMO_DVH_CLIENT_ID = "demo_server";
@@ -64,10 +67,37 @@ async function fetchDemoPlan(): Promise<{
   planScope: string;
   therapeuticWindowEligible: boolean;
 }> {
+  if (isOfflineBuild()) {
+    const csv = `dose,volume,structure
+0,100,PTV70
+35,100,PTV70
+70,95,PTV70
+0,50,Parotid_L
+30,45,Parotid_L
+70,5,Parotid_L`;
+    const bundle = offlineParseDvh(csv, "HN-DEMO-001.csv");
+    const composite = offlineEvaluateComposite(bundle, {
+      totalDose: 70,
+      numFractions: 35,
+      cancerSite: "HN",
+      fileHint: "HN-DEMO-001",
+    });
+    const names = Object.keys(bundle.dvhByStructure);
+    return {
+      serverDvhSessionId: "",
+      fileName: "HN-DEMO-001",
+      primaryTarget: "PTV70",
+      oarStructure: "Parotid_L",
+      structureNames: names,
+      composite,
+      planScope: "multi_structure",
+      therapeuticWindowEligible: true,
+    };
+  }
+
   const input = encodeURIComponent(JSON.stringify({ json: null }));
-  const res = await fetch(
+  const res = await appFetch(
     `${getApiBaseUrl()}/api/trpc/radiobiology.getDemoKastooriPlan?input=${input}`,
-    { credentials: "include" },
   );
   const body = await res.json();
   const payload = body?.result?.data?.json ?? body?.result?.data;

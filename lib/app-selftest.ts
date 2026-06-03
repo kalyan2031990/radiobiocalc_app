@@ -3,6 +3,9 @@
  */
 
 import { getApiBaseUrl } from "@/constants/oauth";
+import { appFetch } from "@/lib/api-fetch";
+import { isOfflineBuild } from "@/lib/offline-mode";
+import { offlineEngineSelfTest } from "@/lib/offline-engine";
 
 export type SelfTestCheck = {
   id: string;
@@ -24,10 +27,46 @@ const NTCP_MAX = 0.95;
 
 export async function runAppSelfTest(): Promise<SelfTestResult> {
   const checks: SelfTestCheck[] = [];
+
+  if (isOfflineBuild()) {
+    const engine = offlineEngineSelfTest();
+    checks.push({
+      id: "offline_engine",
+      label: "Offline radiobiology engine",
+      ok: engine.ok,
+      detail: engine.detail,
+    });
+    const base = getApiBaseUrl();
+    if (base) {
+      try {
+        const health = await appFetch(`${base}/api/health`);
+        const healthJson = await health.json().catch(() => ({}));
+        checks.push({
+          id: "export_server",
+          label: "Report export server (optional)",
+          ok: health.ok && healthJson?.ok === true,
+          detail: health.ok ? base : `HTTP ${health.status}`,
+        });
+      } catch (e) {
+        checks.push({
+          id: "export_server",
+          label: "Report export server (optional)",
+          ok: false,
+          detail: e instanceof Error ? e.message : "Unreachable",
+        });
+      }
+    }
+    return {
+      ok: checks.filter((c) => c.id !== "export_server").every((c) => c.ok),
+      checks,
+      ranAt: new Date().toISOString(),
+    };
+  }
+
   const base = getApiBaseUrl();
 
   try {
-    const health = await fetch(`${base}/api/health`, { credentials: "include" });
+    const health = await appFetch(`${base}/api/health`);
     const healthJson = await health.json().catch(() => ({}));
     checks.push({
       id: "health",
@@ -46,9 +85,8 @@ export async function runAppSelfTest(): Promise<SelfTestResult> {
 
   try {
     const input = encodeURIComponent(JSON.stringify({ json: null }));
-    const res = await fetch(
+    const res = await appFetch(
       `${base}/api/trpc/radiobiology.getDemoKastooriPlan?input=${input}`,
-      { credentials: "include" },
     );
     const body = await res.json();
     const payload = body?.result?.data?.json ?? body?.result?.data;

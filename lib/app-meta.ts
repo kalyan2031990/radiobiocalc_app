@@ -5,7 +5,7 @@
 import Constants from "expo-constants";
 
 /** Keep in sync with app.config.ts `version`. */
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.1.0";
 
 export const APP_DISPLAY_NAME = "rbGyanX";
 export const APP_TAGLINE = "One Patient · One Plan · Complete Evaluation";

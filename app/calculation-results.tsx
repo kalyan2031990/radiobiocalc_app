@@ -37,6 +37,8 @@ import type { ParsedDvhBundle } from "@/lib/plan-evaluation";
 import { doseMetricsRowsForEvaluation } from "@/lib/dose-metrics-guidelines";
 import { savePlanEvalSession } from "@/lib/plan-eval-session";
 import { ParameterProvenancePanel } from "@/components/parameter-provenance-panel";
+import { isOfflineBuild } from "@/lib/offline-mode";
+import { offlineCalculate, offlineEvaluateComposite } from "@/lib/offline-engine";
 
 interface DoseMetrics {
   meanDose: number;
@@ -171,31 +173,52 @@ export default function CalculationResultsScreen() {
 
       setPlanStats(computePlanDescriptiveStats(points));
 
-      const response = await calculateMutation.mutateAsync({
-        dvh: points,
-        totalDose,
-        numFractions,
-        organ,
-        structureType,
-        model: model as
-          | "lkb_loglogit"
-          | "lkb_probit"
-          | "poisson"
-          | "zaider_minerbo"
-          | "poisson_dvh",
-        cancerSite,
-        technique,
-        targetType: structureType === "target" ? targetType : undefined,
-        parameters: customParameters,
-        geudExponent: Number.isNaN(geudExponent) ? 1 : geudExponent,
-      });
+      let data;
+      if (isOfflineBuild()) {
+        data = offlineCalculate({
+          dvh: points,
+          totalDose,
+          numFractions,
+          organ,
+          structureType,
+          model: model as
+            | "lkb_loglogit"
+            | "lkb_probit"
+            | "poisson"
+            | "zaider_minerbo"
+            | "poisson_dvh",
+          cancerSite,
+          technique,
+          targetType: structureType === "target" ? targetType : undefined,
+          parameters: customParameters,
+          geudExponent: Number.isNaN(geudExponent) ? 1 : geudExponent,
+        });
+      } else {
+        const response = await calculateMutation.mutateAsync({
+          dvh: points,
+          totalDose,
+          numFractions,
+          organ,
+          structureType,
+          model: model as
+            | "lkb_loglogit"
+            | "lkb_probit"
+            | "poisson"
+            | "zaider_minerbo"
+            | "poisson_dvh",
+          cancerSite,
+          technique,
+          targetType: structureType === "target" ? targetType : undefined,
+          parameters: customParameters,
+          geudExponent: Number.isNaN(geudExponent) ? 1 : geudExponent,
+        });
 
-      if (!response.success || !response.data) {
-        Alert.alert("Calculation failed", response.error ?? "Unknown error");
-        return;
+        if (!response.success || !response.data) {
+          Alert.alert("Calculation failed", response.error ?? "Unknown error");
+          return;
+        }
+        data = response.data;
       }
-
-      const data = response.data;
       setResult({
         tcp: data.tcp,
         ntcp: data.ntcp,
@@ -837,7 +860,7 @@ export default function CalculationResultsScreen() {
                   );
                   return;
                 }
-                if (!serverDvhSessionId) {
+                if (!isOfflineBuild() && !serverDvhSessionId) {
                   Alert.alert(
                     "Therapeutic window",
                     "Re-import the plan DVH so the server session is available, then run calculation again.",
@@ -846,24 +869,44 @@ export default function CalculationResultsScreen() {
                 }
                 setTwLoading(true);
                 try {
-                  const evalRes = await evaluatePlanMutation.mutateAsync({
-                    sessionId: serverDvhSessionId,
-                    totalDose,
-                    numFractions,
-                    cancerSite,
-                    technique,
-                    prescriptionGy: totalDose,
-                    tcpModel: "lkb_loglogit",
-                    ntcpModel: "lkb_loglogit",
-                  });
-                  if (!evalRes.success || !evalRes.data) {
-                    Alert.alert(
-                      "Plan evaluation",
-                      evalRes.error ?? "Could not evaluate composite plan",
-                    );
-                    return;
+                  let evaluation;
+                  if (isOfflineBuild()) {
+                    const bundle = dvhSessionId
+                      ? await loadDvhSession(dvhSessionId)
+                      : null;
+                    if (!bundle) {
+                      Alert.alert("Plan evaluation", "No DVH data on device");
+                      return;
+                    }
+                    evaluation = offlineEvaluateComposite(bundle, {
+                      totalDose,
+                      numFractions,
+                      cancerSite,
+                      technique,
+                      prescriptionGy: totalDose,
+                      fileHint: (params.fileName as string) || planLabel || "",
+                    });
+                  } else {
+                    const evalRes = await evaluatePlanMutation.mutateAsync({
+                      sessionId: serverDvhSessionId!,
+                      totalDose,
+                      numFractions,
+                      cancerSite,
+                      technique,
+                      prescriptionGy: totalDose,
+                      tcpModel: "lkb_loglogit",
+                      ntcpModel: "lkb_loglogit",
+                    });
+                    if (!evalRes.success || !evalRes.data) {
+                      Alert.alert(
+                        "Plan evaluation",
+                        evalRes.error ?? "Could not evaluate composite plan",
+                      );
+                      return;
+                    }
+                    evaluation = evalRes.data;
                   }
-                  const planEvalSessionId = await savePlanEvalSession(evalRes.data);
+                  const planEvalSessionId = await savePlanEvalSession(evaluation);
                   router.push({
                     pathname: "/therapeutic-window",
                     params: {

@@ -3,6 +3,7 @@ import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "@/server/routers";
 import { getApiBaseUrl } from "@/constants/oauth";
+import { appFetch } from "@/lib/api-fetch";
 import * as Auth from "@/lib/_core/auth";
 
 /**
@@ -29,12 +30,8 @@ export function createTRPCClient() {
           const token = await Auth.getSessionToken();
           return token ? { Authorization: `Bearer ${token}` } : {};
         },
-        // Custom fetch to include credentials for cookie-based auth
         fetch(url, options) {
-          return fetch(url, {
-            ...options,
-            credentials: "include",
-          });
+          return appFetch(url, options);
         },
       }),
     ],

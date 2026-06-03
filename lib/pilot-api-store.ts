@@ -3,6 +3,7 @@
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { appFetch } from "@/lib/api-fetch";
 
 export const PILOT_API_STORAGE_KEY = "@rbgyanx_pilot_api_url";
 
@@ -50,7 +51,7 @@ export async function testPilotApiConnection(baseUrl: string): Promise<{
     return { ok: false, message: "Enter a server address (e.g. http://192.168.1.10:3000)" };
   }
   try {
-    const res = await fetch(`${url}/api/health`, { method: "GET" });
+    const res = await appFetch(`${url}/api/health`, { method: "GET" });
     if (!res.ok) {
       return { ok: false, message: `Server returned HTTP ${res.status}` };
     }
@@ -60,9 +61,16 @@ export async function testPilotApiConnection(baseUrl: string): Promise<{
       message: body?.ok === true ? "rbGyanX API is running" : "Unexpected health response",
     };
   } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : "Cannot reach server",
-    };
+    const raw = e instanceof Error ? e.message : "Cannot reach server";
+    if (/network request failed/i.test(raw)) {
+      return {
+        ok: false,
+        message:
+          "Network request failed. Check: (1) PC IP from ipconfig — often 192.168.0.x not 192.168.1.x; " +
+          "(2) same Wi‑Fi, not mobile data; (3) Windows Firewall allows Node on port 3000; " +
+          "(4) pilot APK needs HTTP — rebuild after usesCleartextTraffic fix, or use https:// ngrok URL.",
+      };
+    }
+    return { ok: false, message: raw };
   }
 }

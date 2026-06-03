@@ -2,6 +2,7 @@ import * as Linking from "expo-linking";
 import * as ReactNative from "react-native";
 import { resolveApiBaseUrl } from "@/lib/api-config";
 import { getPilotApiOverride } from "@/lib/pilot-api-store";
+import { isOfflineBuild } from "@/lib/offline-mode";
 
 // Extract scheme from bundle ID (last segment timestamp, prefixed with "manus")
 // e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
@@ -31,9 +32,14 @@ export const API_BASE_URL = env.apiBaseUrl;
  * Metro runs on 8081, API server runs on 3000.
  * URL pattern: https://PORT-sandboxid.region.domain
  */
+/**
+ * API base URL. Offline/mobile builds use network only for PDF/DOCX export —
+ * set via Home → Report export server (stored override). No default LAN IP.
+ */
 export function getApiBaseUrl(): string {
-  const pilot = getPilotApiOverride();
-  if (pilot) return pilot;
+  const override = getPilotApiOverride();
+  if (override) return override;
+  if (isOfflineBuild()) return "";
   return resolveApiBaseUrl(API_BASE_URL);
 }
 
