@@ -1,0 +1,662 @@
+/**
+ * Core Radiobiology Calculation Engine
+ * 
+ * Implements traditional radiobiological models for:
+ * - BED (Biologically Effective Dose)
+ * - EQD2 (Equivalent Dose in 2 Gy fractions)
+ * - gEUD (Generalized Equivalent Uniform Dose)
+ * - EUD (Equivalent Uniform Dose)
+ * - TCP (Tumor Control Probability) - Poisson and LKB models
+ * - NTCP (Normal Tissue Complication Probability) - LKB and Poisson models
+ * 
+ * References:
+ * [1] Niemierko A. Reporting and analyzing dose distributions: a concept of equivalent uniform dose. Med Phys. 1997;24(1):103-110.
+ * [2] Lyman JT. Complication probability as assessed from dose-volume histograms. Radiat Res Suppl. 1985;8:S13-S19.
+ * [3] Kutcher GJ, Burman C. Calculation of complication probability factors for non-uniform normal tissue irradiation. Int J Radiat Oncol Biol Phys. 1989;16(6):1623-1630.
+ * [4] Bentzen SM, Constanzo J. Radiotherapy toxicity. Acta Oncol. 1998;37(4):329-334.
+ */
+
+import { z } from "zod";
+import { getTcpSiteParams } from "./tcp-site-params";
+import { getTechnique } from "./techniques";
+import { computeExtendedPhysicalMetrics } from "./tcp-dvh-engine";
+import {
+  computePoissonTcpFromDvh,
+} from "./tcp-dvh-engine";
+import { computeZaiderMinerboTcp } from "./zaider-minerbo";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Type Definitions
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DVHPoint {
+  dose: number; // Gy
+  volume: number; // cm³ or relative volume (0-1)
+}
+
+export interface DoseMetrics {
+  meanDose: number;
+  maxDose: number;
+  minDose: number;
+  totalVolume: number;
+  gEUD: number;
+  eud: number;
+  vxx: Record<number, number>; // V5, V10, V20, etc. (% volume)
+  dxx: Record<number, number>; // D1, D2, D5, etc. (Gy)
+  d95?: number;
+  d98?: number;
+  d50?: number;
+  d2?: number;
+  v95?: number;
+  v100?: number;
+  v107?: number;
+}
+
+export type RadiobiologyModelId =
+  | "lkb_loglogit"
+  | "lkb_probit"
+  | "poisson"
+  | "zaider_minerbo"
+  | "poisson_dvh";
+
+export interface OrganParameters {
+  td50: number; // Tolerance dose at 50% complication rate (Gy)
+  m: number; // Slope parameter for probit model
+  n: number; // Volume effect parameter
+  gamma50: number; // Dose-response gradient
+  alphaBeta: number; // Alpha/beta ratio (Gy)
+  d50: number; // Dose at 50% TCP/NTCP for Poisson model
+  gamma: number; // Dose-response parameter for Poisson
+  s: number; // Seriality parameter (0=parallel, 1=serial)
+}
+
+export interface CalculationRequest {
+  dvh: DVHPoint[];
+  totalDose: number; // Gy
+  numFractions: number;
+  organ: string;
+  structureType: "target" | "oar"; // Target or Organ At Risk
+  model: RadiobiologyModelId;
+  parameters?: Partial<OrganParameters>;
+  /** gEUD volume parameter a (default 1 = mean-dose-like) */
+  geudExponent?: number;
+  cancerSite?: string;
+  technique?: string;
+  targetType?: string;
+  lqMaxDosePerFractionGy?: number;
+}
+
+export interface CalculationResult {
+  organ: string;
+  model: string;
+  tcp?: number;
+  ntcp?: number;
+  bed: number;
+  eqd2: number;
+  doseMetrics: DoseMetrics;
+  parameters: OrganParameters;
+  timestamp: string;
+  cancerSite?: string;
+  technique?: string;
+  lqCaution?: boolean;
+  zmDetails?: {
+    nEff: number;
+    p0SingleCell: number;
+    repopFactor: number;
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dose Calculation Functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate Biologically Effective Dose (BED)
+ * BED = D × (1 + d / (α/β))
+ * where D = total dose, d = dose per fraction, α/β = alpha/beta ratio
+ */
+export function calculateBED(
+  totalDose: number,
+  numFractions: number,
+  alphaBeta: number
+): number {
+  if (totalDose <= 0 || numFractions <= 0 || alphaBeta <= 0) {
+    return 0;
+  }
+
+  const dosePerFraction = totalDose / numFractions;
+  const bed = totalDose * (1 + dosePerFraction / alphaBeta);
+  return bed;
+}
+
+/**
+ * Calculate Equivalent Dose in 2 Gy fractions (EQD2)
+ * EQD2 = D × ((α/β + d) / (α/β + 2))
+ * where D = total dose, d = dose per fraction, α/β = alpha/beta ratio
+ */
+export function calculateEQD2(
+  totalDose: number,
+  numFractions: number,
+  alphaBeta: number
+): number {
+  if (totalDose <= 0 || numFractions <= 0 || alphaBeta <= 0) {
+    return 0;
+  }
+
+  const dosePerFraction = totalDose / numFractions;
+  const eqd2 = totalDose * ((alphaBeta + dosePerFraction) / (alphaBeta + 2));
+  return eqd2;
+}
+
+/**
+ * Calculate generalized Equivalent Uniform Dose (gEUD)
+ * gEUD = (Σ vi × Di^a)^(1/a)
+ * where vi = relative volume at dose Di, a = volume parameter
+ */
+export function calculateGEUD(
+  dvh: DVHPoint[],
+  aParameter: number = 1
+): number {
+  if (dvh.length === 0) {
+    return 0;
+  }
+
+  // Normalize volumes to relative volumes (0-1)
+  const totalVolume = Math.max(...dvh.map((p) => p.volume));
+  if (totalVolume <= 0) {
+    return 0;
+  }
+
+  const relativeVolumes = dvh.map((p) => p.volume / totalVolume);
+
+  // Special cases
+  if (Math.abs(aParameter) < 1e-10) {
+    // a ≈ 0: geometric mean
+    const logSum = relativeVolumes.reduce(
+      (sum, vi, i) => sum + vi * Math.log(Math.max(dvh[i].dose, 1e-10)),
+      0
+    );
+    return Math.exp(logSum);
+  }
+
+  if (Math.abs(aParameter - 1) < 1e-10) {
+    // a = 1: arithmetic mean (mean dose)
+    return relativeVolumes.reduce((sum, vi, i) => sum + vi * dvh[i].dose, 0);
+  }
+
+  if (!isFinite(aParameter)) {
+    // a = ∞: maximum dose
+    return Math.max(...dvh.map((p) => p.dose));
+  }
+
+  // General case
+  const sum = relativeVolumes.reduce(
+    (sum, vi, i) => sum + vi * Math.pow(Math.max(dvh[i].dose, 1e-10), aParameter),
+    0
+  );
+
+  if (sum <= 0) {
+    return 0;
+  }
+
+  return Math.pow(sum, 1 / aParameter);
+}
+
+/**
+ * Calculate Equivalent Uniform Dose (EUD)
+ * Simplified version using mean dose and volume effect
+ */
+export function calculateEUD(
+  meanDose: number,
+  totalVolume: number,
+  volumeParameter: number = 1
+): number {
+  if (meanDose <= 0 || totalVolume <= 0) {
+    return 0;
+  }
+
+  // EUD ≈ mean dose adjusted for volume
+  return meanDose * Math.pow(totalVolume, -volumeParameter);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DVH Processing Functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate comprehensive dose metrics from DVH
+ */
+export function calculateDoseMetrics(dvh: DVHPoint[]): DoseMetrics {
+  if (dvh.length === 0) {
+    return {
+      meanDose: 0,
+      maxDose: 0,
+      minDose: 0,
+      totalVolume: 0,
+      gEUD: 0,
+      eud: 0,
+      vxx: {},
+      dxx: {},
+    };
+  }
+
+  // Sort by dose
+  const sortedDVH = [...dvh].sort((a, b) => a.dose - b.dose);
+
+  const doses = sortedDVH.map((p) => p.dose);
+  const volumes = sortedDVH.map((p) => p.volume);
+  const totalVolume = Math.max(...volumes);
+
+  if (totalVolume <= 0) {
+    return {
+      meanDose: 0,
+      maxDose: 0,
+      minDose: 0,
+      totalVolume: 0,
+      gEUD: 0,
+      eud: 0,
+      vxx: {},
+      dxx: {},
+    };
+  }
+
+  const relativeVolumes = volumes.map((v) => v / totalVolume);
+
+  // Basic metrics
+  const maxDose = Math.max(...doses);
+  const minDose = Math.min(...doses.filter((d) => d > 0));
+  const meanDose = relativeVolumes.reduce((sum, vi, i) => sum + vi * doses[i], 0);
+
+  // Calculate Vxx (% volume receiving >= xx Gy)
+  const vxx: Record<number, number> = {};
+  for (let doseLevel = 5; doseLevel <= 70; doseLevel += 5) {
+    if (doseLevel <= maxDose) {
+      const volumeAtDose = interpolate(doses, relativeVolumes, doseLevel);
+      vxx[doseLevel] = volumeAtDose * 100;
+    } else {
+      vxx[doseLevel] = 0;
+    }
+  }
+
+  // Calculate Dxx (dose to xx% of volume)
+  const dxx: Record<number, number> = {};
+  const volumePercentages = [0.01, 0.1, 1, 2, 5, 10, 20, 30, 50, 70, 90, 95, 98];
+  for (const volPercent of volumePercentages) {
+    const targetVolFraction = volPercent / 100;
+    if (targetVolFraction <= 1.0) {
+      // Reverse interpolation: find dose at given volume
+      const reversedDoses = [...doses].reverse();
+      const reversedVolumes = [...relativeVolumes].reverse();
+      const doseAtVolume = interpolate(reversedVolumes, reversedDoses, targetVolFraction);
+      dxx[volPercent] = doseAtVolume;
+    }
+  }
+
+  const gEUD = calculateGEUD(sortedDVH, 1); // a=1 for mean dose
+  const eud = calculateEUD(meanDose, totalVolume, 0.1);
+  const ext = computeExtendedPhysicalMetrics(sortedDVH);
+
+  return {
+    meanDose,
+    maxDose,
+    minDose,
+    totalVolume,
+    gEUD,
+    eud,
+    vxx,
+    dxx,
+    d95: ext.d95,
+    d98: ext.d98,
+    d50: ext.d50,
+    d2: ext.d2,
+    v95: ext.v95,
+    v100: ext.v100,
+    v107: ext.v107,
+  };
+}
+
+/**
+ * Linear interpolation helper function
+ */
+function interpolate(x: number[], y: number[], xi: number): number {
+  if (x.length < 2) return 0;
+
+  // Find the two points to interpolate between
+  let idx = 0;
+  while (idx < x.length - 1 && x[idx + 1] < xi) {
+    idx++;
+  }
+
+  if (idx === x.length - 1) {
+    return y[idx];
+  }
+
+  const x0 = x[idx];
+  const x1 = x[idx + 1];
+  const y0 = y[idx];
+  const y1 = y[idx + 1];
+
+  if (x1 === x0) {
+    return y0;
+  }
+
+  return y0 + ((xi - x0) / (x1 - x0)) * (y1 - y0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NTCP Models
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate NTCP using LKB Log-Logistic model
+ * NTCP = 1 / (1 + (TD50 / gEUD)^(4 × γ50))
+ * 
+ * Reference: Lyman JT. Complication probability as assessed from dose-volume histograms. 
+ * Radiat Res Suppl. 1985;8:S13-S19.
+ */
+export function calculateNTCP_LKB_LogLogit(
+  gEUD: number,
+  td50: number,
+  gamma50: number
+): number {
+  if (gEUD <= 0 || td50 <= 0 || gamma50 <= 0) {
+    return 0;
+  }
+
+  try {
+    const ratio = td50 / gEUD;
+    const exponent = 4 * gamma50;
+    const ntcp = 1 / (1 + Math.pow(ratio, exponent));
+    return Math.max(0, Math.min(1, ntcp)); // Clamp to [0, 1]
+  } catch {
+    return gEUD < td50 ? 0 : 1;
+  }
+}
+
+/**
+ * Calculate NTCP using LKB Probit model
+ * NTCP = Φ((D - TD50) / (m × TD50))
+ * where Φ is the cumulative normal distribution
+ * 
+ * Reference: Kutcher GJ, Burman C. Calculation of complication probability factors 
+ * for non-uniform normal tissue irradiation. Int J Radiat Oncol Biol Phys. 1989;16(6):1623-1630.
+ */
+export function calculateNTCP_LKB_Probit(
+  maxDose: number,
+  vEffective: number,
+  td50: number,
+  m: number,
+  n: number
+): number {
+  if (maxDose <= 0 || vEffective <= 0 || td50 <= 0 || m <= 0) {
+    return 0;
+  }
+
+  try {
+    // Effective TD50 adjusted for volume
+    const tdVeff50 = td50 * Math.pow(vEffective, -n);
+
+    // Calculate t parameter
+    const t = (maxDose - tdVeff50) / (m * tdVeff50);
+
+    // Cumulative normal distribution
+    const ntcp = cumulativeNormalDistribution(t);
+    return Math.max(0, Math.min(1, ntcp)); // Clamp to [0, 1]
+  } catch {
+    return maxDose < td50 ? 0 : 1;
+  }
+}
+
+/**
+ * Calculate NTCP using Poisson model
+ * NTCP = 1 - exp(-λ × (D / D50)^γ)
+ * 
+ * Reference: Niemierko A. A generalized concept of equivalent uniform dose (EUD). 
+ * Med Phys. 1999;26(6):1100.
+ */
+export function calculateNTCP_Poisson(
+  meanDose: number,
+  d50: number,
+  gamma: number,
+  s: number
+): number {
+  if (meanDose <= 0 || d50 <= 0 || gamma <= 0 || s <= 0) {
+    return 0;
+  }
+
+  try {
+    const doseRatio = meanDose / d50;
+    const lambda = Math.pow(doseRatio, gamma);
+    const ntcp = 1 - Math.exp(-s * lambda);
+    return Math.max(0, Math.min(1, ntcp)); // Clamp to [0, 1]
+  } catch {
+    return 0;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TCP Models
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate TCP using Poisson model
+ * TCP = exp(-N × S(D))
+ * where N = number of clonogenic cells, S(D) = survival probability at dose D
+ */
+export function calculateTCP_Poisson(
+  meanDose: number,
+  d50: number,
+  gamma: number,
+  numClonogenicCells: number = 1e7
+): number {
+  if (meanDose <= 0 || d50 <= 0 || gamma <= 0) {
+    return 0;
+  }
+
+  try {
+    const doseRatio = meanDose / d50;
+    const survivalProbability = Math.exp(-Math.pow(doseRatio, gamma));
+    const tcp = Math.exp(-numClonogenicCells * (1 - survivalProbability));
+    return Math.max(0, Math.min(1, tcp)); // Clamp to [0, 1]
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Calculate TCP using LKB-based model
+ * Simplified: TCP = 1 / (1 + (TD50 / gEUD)^(4 × γ50))
+ * (Similar to NTCP but with different parameters)
+ */
+export function calculateTCP_LKB(
+  gEUD: number,
+  td50: number,
+  gamma50: number
+): number {
+  if (gEUD <= 0 || td50 <= 0 || gamma50 <= 0) {
+    return 0;
+  }
+
+  try {
+    const ratio = td50 / gEUD;
+    const exponent = 4 * gamma50;
+    const tcp = 1 / (1 + Math.pow(ratio, exponent));
+    return Math.max(0, Math.min(1, tcp)); // Clamp to [0, 1]
+  } catch {
+    return gEUD < td50 ? 0 : 1;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Statistical Helper Functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Cumulative normal distribution function (approximation)
+ * Used for probit model calculations
+ */
+function cumulativeNormalDistribution(x: number): number {
+  // Approximation using error function
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+
+  const sign = x < 0 ? -1 : 1;
+  const absX = Math.abs(x);
+
+  const t = 1 / (1 + p * absX);
+  const y =
+    1 -
+    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t *
+      Math.exp(-absX * absX));
+
+  return 0.5 * (1 + sign * y);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Calculation Function
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Cumulative Eclipse DVH → differential bins for EUD/gEUD/mean dose. */
+function toDifferentialDVH(dvh: DVHPoint[]): DVHPoint[] {
+  if (dvh.length < 2) return dvh;
+  let cumulative = true;
+  for (let i = 1; i < dvh.length; i++) {
+    if (dvh[i].volume > dvh[i - 1].volume + 1e-3) {
+      cumulative = false;
+      break;
+    }
+  }
+  if (!cumulative) return dvh;
+
+  const diff: DVHPoint[] = [];
+  for (let i = 0; i < dvh.length; i++) {
+    const vol =
+      i === 0
+        ? dvh[i].volume
+        : Math.max(0, dvh[i - 1].volume - dvh[i].volume);
+    if (vol > 1e-9) {
+      diff.push({ dose: dvh[i].dose, volume: vol });
+    }
+  }
+  return diff.length > 0 ? diff : dvh;
+}
+
+/**
+ * Perform comprehensive radiobiological calculation
+ */
+export function performCalculation(
+  request: CalculationRequest,
+  defaultParameters: OrganParameters
+): CalculationResult {
+  // Merge parameters
+  const params = { ...defaultParameters, ...request.parameters };
+
+  const dvhDiff = toDifferentialDVH(request.dvh);
+
+  // Calculate dose metrics
+  const doseMetrics = calculateDoseMetrics(dvhDiff);
+  const aExp = request.geudExponent ?? 1;
+  if (aExp !== 1) {
+    doseMetrics.gEUD = calculateGEUD(dvhDiff, aExp);
+  }
+
+  const technique = getTechnique(request.technique ?? "IMRT");
+  const lqMax =
+    request.lqMaxDosePerFractionGy ??
+    technique?.lqValidMaxDosePerFractionGy ??
+    10;
+  const dpf = request.totalDose / request.numFractions;
+  const lqCaution = dpf > lqMax;
+
+  const siteParams = request.cancerSite
+    ? getTcpSiteParams(request.cancerSite)
+    : null;
+  const alphaBeta =
+    siteParams?.alphaBetaGy ?? params.alphaBeta;
+
+  // Calculate BED and EQD2
+  const bed = calculateBED(request.totalDose, request.numFractions, alphaBeta);
+  const eqd2 = calculateEQD2(request.totalDose, request.numFractions, alphaBeta);
+
+  // Calculate TCP or NTCP based on structure type
+  let tcp: number | undefined;
+  let ntcp: number | undefined;
+  let zmDetails: CalculationResult["zmDetails"];
+  let modelUsed = request.model;
+
+  if (request.structureType === "target") {
+    const targetType = request.targetType ?? "PTV";
+    if (request.model === "zaider_minerbo" && siteParams) {
+      const zm = computeZaiderMinerboTcp(
+        dvhDiff,
+        request.numFractions,
+        siteParams,
+        targetType,
+        lqMax
+      );
+      tcp = zm.tcp;
+      zmDetails = {
+        nEff: zm.nEff,
+        p0SingleCell: zm.p0SingleCell,
+        repopFactor: zm.repopFactor,
+      };
+    } else if (request.model === "poisson_dvh" && siteParams) {
+      tcp = computePoissonTcpFromDvh(
+        dvhDiff,
+        request.numFractions,
+        siteParams,
+        targetType,
+        lqMax
+      );
+    } else if (request.model === "poisson") {
+      tcp = calculateTCP_Poisson(doseMetrics.meanDose, params.d50, params.gamma);
+    } else if (request.model === "lkb_loglogit") {
+      tcp = calculateTCP_LKB(doseMetrics.gEUD, params.td50, params.gamma50);
+    }
+  } else {
+    // NTCP for OARs — TCP-only models are not valid here
+    modelUsed =
+      request.model === "zaider_minerbo" || request.model === "poisson_dvh"
+        ? "lkb_loglogit"
+        : request.model;
+
+    if (modelUsed === "lkb_loglogit") {
+      ntcp = calculateNTCP_LKB_LogLogit(doseMetrics.gEUD, params.td50, params.gamma50);
+    } else if (modelUsed === "lkb_probit") {
+      ntcp = calculateNTCP_LKB_Probit(
+        doseMetrics.maxDose,
+        1.0,
+        params.td50,
+        params.m,
+        params.n
+      );
+    } else if (modelUsed === "poisson") {
+      ntcp = calculateNTCP_Poisson(
+        doseMetrics.meanDose,
+        params.d50,
+        params.gamma,
+        params.s
+      );
+    }
+  }
+
+  return {
+    organ: request.organ,
+    model: modelUsed,
+    tcp,
+    ntcp,
+    bed,
+    eqd2,
+    doseMetrics,
+    parameters: params,
+    timestamp: new Date().toISOString(),
+    cancerSite: request.cancerSite,
+    technique: request.technique,
+    lqCaution,
+    zmDetails,
+  };
+}

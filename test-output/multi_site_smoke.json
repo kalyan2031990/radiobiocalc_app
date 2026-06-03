@@ -1,0 +1,111 @@
+{
+  "generatedAt": "2026-06-03T06:52:48.541Z",
+  "results": [
+    {
+      "site": "BRAIN",
+      "tcp": {
+        "patient": "KASTOORI_PTV70.txt",
+        "organ": "PTV",
+        "tcpPct": 0,
+        "fields": 17
+      },
+      "ntcp": {
+        "patient": "ABDUL SALAM  CORD.txt",
+        "organ": "Spinal Cord",
+        "ntcpPct": 0.0001397048885914407,
+        "endpoint": "Myelopathy",
+        "fields": 17
+      }
+    },
+    {
+      "site": "HN",
+      "tcp": {
+        "patient": "KASTOORI_PTV70.txt",
+        "organ": "PTV",
+        "tcpPct": 0,
+        "fields": 18
+      },
+      "ntcp": {
+        "patient": "ABDUL SALAM  CORD.txt",
+        "organ": "Spinal Cord",
+        "ntcpPct": 0.0001397048885914407,
+        "endpoint": "Myelopathy",
+        "fields": 18
+      }
+    },
+    {
+      "site": "BREAST",
+      "tcp": {
+        "patient": "KASTOORI_PTV70.txt",
+        "organ": "PTV",
+        "tcpPct": 0,
+        "fields": 18
+      },
+      "ntcp": {
+        "patient": "ABDUL SALAM  CORD.txt",
+        "organ": "Spinal Cord",
+        "ntcpPct": 0.0001397048885914407,
+        "endpoint": "Myelopathy",
+        "fields": 18
+      }
+    },
+    {
+      "site": "LUNG",
+      "tcp": {
+        "patient": "KASTOORI_PTV70.txt",
+        "organ": "PTV",
+        "tcpPct": 0,
+        "fields": 17
+      },
+      "ntcp": {
+        "patient": "ABDUL SALAM  CORD.txt",
+        "organ": "Spinal Cord",
+        "ntcpPct": 0.0001397048885914407,
+        "endpoint": "Myelopathy",
+        "fields": 17
+      }
+    },
+    {
+      "site": "CERVIX",
+      "tcp": {
+        "patient": "KASTOORI_PTV70.txt",
+        "organ": "PTV",
+        "tcpPct": 0,
+        "fields": 16
+      },
+      "ntcp": {
+        "patient": "ABDUL SALAM  CORD.txt",
+        "organ": "Spinal Cord",
+        "ntcpPct": 0.0001397048885914407,
+        "endpoint": "Myelopathy",
+        "fields": 16
+      }
+    },
+    {
+      "site": "RECTUM",
+      "tcp": {
+        "patient": "KASTOORI_PTV70.txt",
+        "organ": "PTV",
+        "tcpPct": 0,
+        "fields": 16
+      },
+      "ntcp": {
+        "patient": "ABDUL SALAM  CORD.txt",
+        "organ": "Spinal Cord",
+        "ntcpPct": 0.0001397048885914407,
+        "endpoint": "Myelopathy",
+        "fields": 16
+      }
+    },
+    {
+      "site": "PROSTATE",
+      "tcp": {
+        "patient": "KASTOORI_PTV70.txt",
+        "organ": "PTV",
+        "tcpPct": 0,
+        "fields": 17
+      },
+      "note": "No site-specific OAR DVH on disk; TCP + clinical fields only"
+    }
+  ]
+}

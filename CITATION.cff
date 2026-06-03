@@ -1,0 +1,126 @@
+cff-version: 1.2.0
+title: RadioBioCalc - Mobile App for Radiobiology and Dosimetry Calculations
+abstract: >
+  RadioBioCalc is a comprehensive mobile application for calculating Tumor Control Probability (TCP) 
+  and Normal Tissue Complication Probability (NTCP) in radiation oncology. The app implements traditional 
+  radiobiological models (LKB Log-Logistic, LKB Probit, Poisson) based on QUANTEC and RTOG guidelines, 
+  supporting all contemporary external beam photon radiotherapy modalities. Features include fractionation-aware 
+  biological DVH calculations, multi-format report export, patient database management, real-time collaboration, 
+  institutional audit trails, and predictive plan optimization based on historical case analysis.
+
+authors:
+  - family-names: "Manus"
+    given-names: "AI"
+    affiliation: "Manus AI Research"
+    role: "Developer"
+
+contributors:
+  - family-names: "Radiation Oncology"
+    given-names: "Medical Physics Community"
+    role: "Domain Expertise"
+
+keywords:
+  - "Radiobiology"
+  - "Dosimetry"
+  - "TCP"
+  - "NTCP"
+  - "Radiation Oncology"
+  - "Medical Physics"
+  - "Treatment Planning"
+  - "Mobile Application"
+  - "Clinical Decision Support"
+
+license: "MIT"
+repository-code: "https://github.com/yourusername/radiobiocalc"
+repository-artifact: "https://github.com/yourusername/radiobiocalc/releases"
+
+version: "1.0.0"
+date-released: 2025-01-02
+
+references:
+  - type: journal
+    authors:
+      - family-names: "Niemierko"
+        given-names: "A"
+    title: "Reporting and analyzing dose distributions: A concept of equivalent uniform dose"
+    journal: "Journal of Radiation Oncology Biology Physics"
+    year: 1997
+    volume: 37
+    issue: 1
+    pages: "207-213"
+
+  - type: journal
+    authors:
+      - family-names: "Lyman"
+        given-names: "JT"
+    title: "Complication probability as assessed from dose-volume histograms"
+    journal: "Radiation Research"
+    year: 1985
+    volume: 104
+    pages: "S13-S19"
+
+  - type: journal
+    authors:
+      - family-names: "Kutcher"
+        given-names: "GJ"
+      - family-names: "Burman"
+        given-names: "C"
+      - family-names: "Brewster"
+        given-names: "L"
+    title: "Histogram reduction method for calculating complication probabilities for three-dimensional treatment planning evaluations"
+    journal: "International Journal of Radiation Oncology Biology Physics"
+    year: 1991
+    volume: 21
+    issue: 1
+    pages: "137-146"
+
+  - type: journal
+    authors:
+      - family-names: "Bentzen"
+        given-names: "SM"
+      - family-names: "Constine"
+        given-names: "LS"
+      - family-names: "Deasy"
+        given-names: "JO"
+    title: "Quantitative Analyses of Normal Tissue Effects in the Clinic (QUANTEC): An introduction to the scientific issues"
+    journal: "International Journal of Radiation Oncology Biology Physics"
+    year: 2010
+    volume: 76
+    issue: 3
+    pages: "S3-S9"
+
+  - type: journal
+    authors:
+      - family-names: "Emami"
+        given-names: "B"
+      - family-names: "Lyman"
+        given-names: "J"
+      - family-names: "Brown"
+        given-names: "A"
+    title: "Tolerance of normal tissue to therapeutic irradiation"
+    journal: "International Journal of Radiation Oncology Biology Physics"
+    year: 1991
+    volume: 21
+    issue: 1
+    pages: "109-122"
+
+  - type: report
+    authors:
+      - family-names: "RTOG"
+    title: "Radiation Therapy Oncology Group Clinical Trials"
+    publisher: "RTOG Foundation"
+    year: 2024
+
+  - type: software
+    authors:
+      - family-names: "Expo"
+    title: "Expo - The React Native Framework"
+    url: "https://expo.dev"
+    version: "54.0"
+
+  - type: software
+    authors:
+      - family-names: "tRPC"
+    title: "tRPC - Move Fast and Break Nothing"
+    url: "https://trpc.io"
+    version: "11.7"
