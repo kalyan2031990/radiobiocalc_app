@@ -38,7 +38,7 @@ const config: ExpoConfig = {
     offlineBuild: isOfflineBuild,
     pilotBuild: isPilotBuild,
     eas: {
-      projectId: "956761c0-431c-4624-bbed-6381ab7e4516",
+      projectId: "18c44a97-154f-45ec-93d4-a38b115fe196",
     },
   },
   description: "Knowledge-guided clinical decision support system (CDSS) framework for radiation oncology. Calculates TCP/NTCP, BED, EQD2, EUD using traditional radiobiological models with QUANTEC/RTOG parameters. Supports single-patient and cohort outcome evaluation. Privacy-first with offline-capable calculations.",
