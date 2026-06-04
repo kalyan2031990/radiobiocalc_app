@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   TextInput,
   FlatList,
+  Switch,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -138,6 +139,7 @@ export default function CalculationSetupScreen() {
   const [patientId, setPatientId] = useState("");
   const [planLabel, setPlanLabel] = useState("Plan 1");
   const [clinical, setClinical] = useState<ClinicalContext>({ ...EMPTY_CLINICAL });
+  const [includeClinicalInReport, setIncludeClinicalInReport] = useState(true);
   const [selectedStructure, setSelectedStructure] = useState("");
   const [structureType, setStructureType] = useState<"target" | "oar">("oar");
   const [totalDose, setTotalDose] = useState("70");
@@ -462,6 +464,7 @@ export default function CalculationSetupScreen() {
         parametersJSON: paramsPayload ? JSON.stringify(paramsPayload) : "",
         useCustomParams: useCustomParams ? "1" : "0",
         clinicalJSON: JSON.stringify(clinical),
+        includeClinicalInReport: includeClinicalInReport ? "1" : "0",
       },
     });
   };
@@ -1071,6 +1074,26 @@ export default function CalculationSetupScreen() {
                 organ={selectedOrgan}
                 colors={colors}
               />
+
+              <View
+                className="flex-row items-center justify-between rounded-xl px-4 py-3"
+                style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+              >
+                <View className="flex-1 pr-3">
+                  <Text style={{ color: colors.foreground, fontWeight: "600", fontSize: 14 }}>
+                    Include clinical context in PDF/DOCX
+                  </Text>
+                  <Text style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>
+                    Site-specific presets (HPV, chemo, smoking, age, BMI, etc.) — documented in
+                    report only; does not change TCP/NTCP.
+                  </Text>
+                </View>
+                <Switch
+                  value={includeClinicalInReport}
+                  onValueChange={setIncludeClinicalInReport}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                />
+              </View>
 
               {parameters && (
                 <View className="gap-3">

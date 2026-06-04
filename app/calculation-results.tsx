@@ -791,6 +791,9 @@ export default function CalculationResultsScreen() {
                   maxDose: String(result.doseMetrics.maxDose),
                   gEUD: String(result.doseMetrics.gEUD ?? result.doseMetrics.meanDose),
                   doseMetricsJSON: JSON.stringify(guidelineMetrics),
+                  clinicalJSON: (params.clinicalJSON as string) || "",
+                  includeClinicalInReport:
+                    (params.includeClinicalInReport as string) === "0" ? "0" : "1",
                 },
               })
             }

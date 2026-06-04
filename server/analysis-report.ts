@@ -4,6 +4,11 @@
 
 import { getProvenanceFor } from "./literature-references";
 import { buildDocxFromText } from "./docx-builder";
+import {
+  clinicalReportDisclaimer,
+  clinicalReportSiteLabel,
+  type ClinicalReportSection,
+} from "../lib/clinical-report-sections";
 
 export type AnalysisReportInput = {
   patientId: string;
@@ -24,6 +29,9 @@ export type AnalysisReportInput = {
   maxDose: number;
   gEUD: number;
   doseMetricRows: { label: string; value: string; note?: string }[];
+  /** Opt-in: site- and structure-specific clinical presets in PDF/DOCX */
+  includeClinicalInReport?: boolean;
+  clinicalSections?: ClinicalReportSection[];
 };
 
 export type AnalysisReportOutput = {
@@ -61,6 +69,18 @@ export function buildAnalysisReport(input: AnalysisReportInput): AnalysisReportO
     .map((r) => `<li>${escapeHtml(r.citation)}</li>`)
     .join("");
 
+  const includeClinical = input.includeClinicalInReport === true;
+  const clinicalHtml = includeClinical
+    ? formatClinicalHtml(
+        input.clinicalSections ?? [],
+        input.cancerSite,
+        includeClinical,
+      )
+    : "";
+  const clinicalDocx = includeClinical
+    ? formatClinicalDocx(input.clinicalSections ?? [], input.cancerSite, includeClinical)
+    : [];
+
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><title>rbGyanX Report</title>
 <style>
@@ -86,6 +106,7 @@ Fractionation: ${input.totalDose} Gy / ${input.numFractions} fx</p>
 <p>Mean ${input.meanDose.toFixed(2)} Gy · Max ${input.maxDose.toFixed(2)} Gy · gEUD ${input.gEUD.toFixed(2)} Gy</p>
 <h2>Dose metrics (QUANTEC-oriented)</h2>
 <table><tr><th>Metric</th><th>Value</th><th>Note</th></tr>${metricRows}</table>
+${clinicalHtml}
 ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitation)}</p>` : ""}
 <h2>References</h2><ul>${refs}</ul>
 <p class="disclaimer">Research and educational tool only — not for primary clinical decisions. Verify against institutional protocols.</p>
@@ -110,6 +131,8 @@ ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitat
     "Dose metrics:",
     ...input.doseMetricRows.map((r) => `  ${r.label}: ${r.value}${r.note ? ` (${r.note})` : ""}`),
     "",
+    ...clinicalDocx,
+    ...(clinicalDocx.length ? [""] : []),
     "References:",
     ...(prov?.references ?? []).map((r) => `  - ${r.citation}`),
     "",
@@ -133,4 +156,58 @@ function escapeHtml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function formatClinicalHtml(
+  sections: ClinicalReportSection[],
+  cancerSite: string,
+  includeClinical: boolean,
+): string {
+  const disclaimer = clinicalReportDisclaimer(includeClinical);
+  const siteLabel = clinicalReportSiteLabel(cancerSite);
+  let body = `<h2>Clinical context (opt-in)</h2>
+<p><em>Cancer site: ${escapeHtml(siteLabel)}</em></p>
+<p class="disclaimer" style="font-size:12px">${escapeHtml(disclaimer)}</p>`;
+
+  if (sections.length === 0) {
+    body += `<p><em>No clinical fields entered for this site and structure.</em></p>`;
+    return body;
+  }
+
+  for (const sec of sections) {
+    const rows = sec.rows
+      .map(
+        (r) =>
+          `<tr><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.value)}</td></tr>`,
+      )
+      .join("");
+    body += `<h3>${escapeHtml(sec.sectionTitle)}</h3>
+<table><tr><th>Field</th><th>Value</th></tr>${rows}</table>`;
+  }
+  return body;
+}
+
+function formatClinicalDocx(
+  sections: ClinicalReportSection[],
+  cancerSite: string,
+  includeClinical: boolean,
+): string[] {
+  const lines: string[] = [
+    "Clinical context (opt-in)",
+    `Cancer site: ${clinicalReportSiteLabel(cancerSite)}`,
+    clinicalReportDisclaimer(includeClinical),
+    "",
+  ];
+  if (sections.length === 0) {
+    lines.push("(No clinical fields entered for this site and structure.)", "");
+    return lines;
+  }
+  for (const sec of sections) {
+    lines.push(sec.sectionTitle);
+    for (const r of sec.rows) {
+      lines.push(`  ${r.label}: ${r.value}`);
+    }
+    lines.push("");
+  }
+  return lines;
 }

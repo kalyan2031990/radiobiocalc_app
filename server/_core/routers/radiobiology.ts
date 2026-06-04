@@ -1135,6 +1135,20 @@ export const radiobiologyRouter = router({
             note: z.string().optional(),
           }),
         ),
+        includeClinicalInReport: z.boolean().optional(),
+        clinicalSections: z
+          .array(
+            z.object({
+              sectionTitle: z.string(),
+              rows: z.array(
+                z.object({
+                  label: z.string(),
+                  value: z.string(),
+                }),
+              ),
+            }),
+          )
+          .optional(),
       }),
     )
     .mutation(({ input }) => {

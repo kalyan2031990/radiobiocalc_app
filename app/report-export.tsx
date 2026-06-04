@@ -11,6 +11,7 @@ import {
   Alert,
   Share,
   Platform,
+  Switch,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -21,6 +22,9 @@ import * as FileSystem from "expo-file-system/legacy";
 import { trpc } from "@/lib/trpc";
 import { getApiBaseUrl } from "@/constants/oauth";
 import { isOfflineBuild } from "@/lib/offline-mode";
+import { buildClinicalReportSections } from "@/lib/clinical-report-sections";
+import { parseClinicalContext } from "@/lib/clinical-fields-schema";
+import { buildAnalysisReport } from "@/server/analysis-report";
 
 function exportServerRequiredMessage(): string {
   return (
@@ -36,6 +40,9 @@ export default function ReportExportScreen() {
   const [lastHtml, setLastHtml] = useState<string | null>(null);
   const [lastDocx, setLastDocx] = useState<string | null>(null);
   const [filenameBase, setFilenameBase] = useState("rbGyanX_report");
+  const [includeClinicalInReport, setIncludeClinicalInReport] = useState(
+    (params.includeClinicalInReport as string) !== "0",
+  );
 
   const generateMutation = trpc.radiobiology.generateAnalysisReport.useMutation();
 
@@ -46,14 +53,22 @@ export default function ReportExportScreen() {
     } catch {
       doseMetricRows = [];
     }
+    const structureType = (params.structureType as "target" | "oar") || "oar";
+    const organ = (params.organ as string) || "OAR";
+    const cancerSite = (params.cancerSite as string) || "UNKNOWN";
+    const clinicalCtx = parseClinicalContext(params.clinicalJSON as string);
+    const clinicalSections = includeClinicalInReport
+      ? buildClinicalReportSections(clinicalCtx, cancerSite, structureType, organ)
+      : undefined;
+
     return {
       patientId: (params.patientId as string) || "—",
       planLabel: (params.planLabel as string) || "Plan",
-      organ: (params.organ as string) || "OAR",
+      organ,
       structureName: (params.structureName as string) || "Structure",
-      structureType: (params.structureType as "target" | "oar") || "oar",
+      structureType,
       model: (params.model as string) || "lkb_loglogit",
-      cancerSite: (params.cancerSite as string) || "HN",
+      cancerSite,
       technique: (params.technique as string) || "IMRT",
       totalDose: parseFloat((params.totalDose as string) || "70"),
       numFractions: parseInt((params.numFractions as string) || "35", 10),
@@ -65,11 +80,31 @@ export default function ReportExportScreen() {
       maxDose: parseFloat((params.maxDose as string) || "0"),
       gEUD: parseFloat((params.gEUD as string) || "0"),
       doseMetricRows,
+      includeClinicalInReport,
+      clinicalSections,
     };
   };
 
+  const buildReportOnDevice = () =>
+    isOfflineBuild() && !getApiBaseUrl();
+
+  const generateReport = async () => {
+    const payload = buildPayload();
+    if (buildReportOnDevice()) {
+      return buildAnalysisReport(payload);
+    }
+    try {
+      const res = await generateMutation.mutateAsync(payload);
+      if (res.success && res.data) return res.data;
+      throw new Error(res.error ?? "Generation failed");
+    } catch {
+      return buildAnalysisReport(payload);
+    }
+  };
+
   const ensureExportServer = (): boolean => {
-    if (isOfflineBuild() && !getApiBaseUrl()) {
+    if (buildReportOnDevice()) return true;
+    if (!getApiBaseUrl()) {
       Alert.alert("Export server required", exportServerRequiredMessage(), [
         { text: "Cancel", style: "cancel" },
         { text: "Open settings", onPress: () => router.push("/pilot-api-setup") },
@@ -82,15 +117,11 @@ export default function ReportExportScreen() {
   const handleGenerate = async () => {
     if (!ensureExportServer()) return null;
     try {
-      const res = await generateMutation.mutateAsync(buildPayload());
-      if (!res.success || !res.data) {
-        Alert.alert("Report", res.error ?? "Generation failed");
-        return null;
-      }
-      setLastHtml(res.data.html);
-      setLastDocx(res.data.docxText);
-      setFilenameBase(res.data.filenameBase);
-      return res.data;
+      const data = await generateReport();
+      setLastHtml(data.html);
+      setLastDocx(data.docxText);
+      setFilenameBase(data.filenameBase);
+      return data;
     } catch (e) {
       Alert.alert("Report", e instanceof Error ? e.message : "Unknown error");
       return null;
@@ -141,22 +172,18 @@ export default function ReportExportScreen() {
   };
 
   const handleDocx = async () => {
-    if (!ensureExportServer()) return;
-    const res = await generateMutation.mutateAsync(buildPayload());
-    if (!res.success || !res.data) {
-      Alert.alert("Report", res.error ?? "Generation failed");
-      return;
-    }
-    const b64 = res.data.docxBase64;
+    const data = await handleGenerate();
+    if (!data) return;
+    const b64 = data.docxBase64;
     if (!b64) {
-      await writeFile(".docx.txt", res.data.docxText, "text/plain");
+      await writeFile(".docx.txt", data.docxText, "text/plain");
       Alert.alert("DOCX", "Saved as plain text fallback.");
       return;
     }
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const name = `${res.data.filenameBase}.docx`;
+    const name = `${data.filenameBase}.docx`;
     if (Platform.OS === "web") {
       const blob = new Blob([bytes], {
         type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -188,23 +215,54 @@ export default function ReportExportScreen() {
         <Text style={{ color: colors.muted }}>
           Includes TCP/NTCP, QUANTEC-oriented metrics, and literature references (Gyan layer).
           {isOfflineBuild()
-            ? " Mobile build: calculations are on-device; report generation uses your export server only."
+            ? buildReportOnDevice()
+              ? " Mobile: report (including clinical section) is built on this device."
+              : " Mobile: calculations on-device; reports via export server or on-device if server not set."
             : ""}
         </Text>
-        {isOfflineBuild() && !getApiBaseUrl() ? (
-          <Pressable
-            onPress={() => router.push("/pilot-api-setup")}
+        {buildReportOnDevice() ? (
+          <View
             style={{
-              backgroundColor: "#FEF3C7",
+              backgroundColor: "#D1FAE5",
               padding: 12,
               borderRadius: 8,
               borderWidth: 1,
-              borderColor: "#FCD34D",
+              borderColor: "#6EE7B7",
             }}
           >
-            <Text style={{ color: "#92400E", fontSize: 13 }}>{exportServerRequiredMessage()}</Text>
-          </Pressable>
+            <Text style={{ color: "#065F46", fontSize: 13 }}>
+              PDF/DOCX built on this device. Optional: set an export server on Home for
+              shared templates or older builds.
+            </Text>
+          </View>
         ) : null}
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: 12,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+          }}
+        >
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={{ color: colors.foreground, fontWeight: "600" }}>
+              Clinical context in report
+            </Text>
+            <Text style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>
+              All filled site-specific fields (patient, disease, treatment, structure).
+            </Text>
+          </View>
+          <Switch
+            value={includeClinicalInReport}
+            onValueChange={setIncludeClinicalInReport}
+            trackColor={{ false: colors.border, true: colors.primary }}
+          />
+        </View>
 
         <Pressable
           onPress={handleGenerate}

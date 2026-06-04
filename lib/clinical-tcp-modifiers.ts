@@ -42,6 +42,6 @@ export function clinicalModifierPlan(
     appliesToCalculation: false,
     plannedFactors: PLANNED_FACTORS,
     summary:
-      "Clinical presets are optional documentation only. TCP/NTCP use DVH + QUANTEC/RTOG literature parameters. Planned: site-specific multivariable adjustment (e.g. HPV, chemo, age for HN TCP) as an explicit opt-in layer — not silent defaults.",
+      "Clinical presets are optional documentation only (included in PDF/DOCX when opted in). TCP/NTCP use DVH + QUANTEC/RTOG literature parameters. Planned: site-specific multivariable adjustment (e.g. HPV, chemo, age for HN TCP) as an explicit opt-in layer — not silent defaults.",
   };
 }
