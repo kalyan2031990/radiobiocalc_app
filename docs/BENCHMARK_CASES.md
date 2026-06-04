@@ -6,7 +6,7 @@ Target: **20–50 locked cases** with expected outputs for automated regression.
 
 | ID | Site | Fractionation | Source DVH | TCP ref | NTCP ref | Notes |
 |----|------|---------------|------------|---------|----------|-------|
-| HN-001 | HN | 70 Gy / 35 fx | KASTOORI PTV70 + parotid | desktop/py | desktop/py | Composite plan smoke |
+| HN-001 | HN | 70 Gy / 35 fx | Demo PTV70 + parotid (external test data) | desktop/py | desktop/py | Composite plan smoke |
 
 ## Modules to cover
 

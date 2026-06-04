@@ -7,31 +7,20 @@ import { parseCSVDVH, mergeDvhData } from "../server/data-handler";
 import { evaluateCompositePlan } from "../server/composite-plan-evaluation";
 import { performCalculation } from "../server/radiobiology";
 import { getOrganParameters } from "../server/parameters";
+import { getRbgyanxTestDataRoot } from "./test-data-root";
 
-const ROOT =
-  process.env.RBGYANX_TEST_DATA ??
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\rbgyanx_test_data";
-
-const PTV = path.join(ROOT, "PTV_data", "KASTOORI_PTV70.txt");
-const OAR = path.join(ROOT, "HN57_OAR_Eclipse", "KASTOORI_COM_PRTD.txt");
-const PAROTID = path.join(ROOT, "HN57_dDVH_CSV", "PT001_Parotid.csv");
-
-async function trpcMutation(procedure: string, input: unknown) {
-  const res = await fetch(`http://localhost:3000/api/trpc/${procedure}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  const json = await res.json();
-  return json;
-}
+const ROOT = getRbgyanxTestDataRoot();
+const HN_PREFIX = process.env.RBGYANX_HN_DEMO_PREFIX?.trim() || "DEMO";
+const PTV = ROOT ? path.join(ROOT, "PTV_data", `${HN_PREFIX}_PTV70.txt`) : "";
+const OAR = ROOT ? path.join(ROOT, "HN57_OAR_Eclipse", `${HN_PREFIX}_COM_PRTD.txt`) : "";
+const PAROTID = ROOT ? path.join(ROOT, "HN57_dDVH_CSV", "PT001_Parotid.csv") : "";
 
 async function main() {
   console.log("=== rbGyanX mobile demo (API) ===\n");
 
-  if (!fs.existsSync(PTV) || !fs.existsSync(OAR)) {
-    console.error("Missing test DVH files");
-    process.exit(1);
+  if (!ROOT || !fs.existsSync(PTV) || !fs.existsSync(OAR)) {
+    console.log("SKIP demo web flow: set RBGYANX_TEST_DATA with demo HN DVH files.");
+    process.exit(0);
   }
 
   const ptv = parseCSVDVH(fs.readFileSync(PTV, "utf8"), path.basename(PTV));
@@ -42,33 +31,35 @@ async function main() {
     totalDose: 70,
     numFractions: 35,
     cancerSite: "HN",
-    fileHint: "KASTOORI",
+    fileHint: HN_PREFIX,
     prescriptionGy: 70,
   });
 
-  console.log("1. Composite plan (KASTOORI PTV + parotid)");
+  console.log(`1. Composite plan (${HN_PREFIX} PTV + parotid)`);
   console.log(`   TCP ${(plan.therapeutic.tcp * 100).toFixed(1)}%`);
   console.log(`   NTCP ${(plan.therapeutic.ntcpComposite * 100).toFixed(1)}%`);
   console.log(`   UTCP ${(plan.therapeutic.utcp * 100).toFixed(1)}%`);
   console.log(`   TWI ${(plan.therapeutic.twi * 100).toFixed(1)}% (${plan.therapeutic.twiInterpretation})`);
 
-  const parotidDvh = parseCSVDVH(fs.readFileSync(PAROTID, "utf8"), "PT001_Parotid.csv");
-  const dvh = Object.values(parotidDvh.dvhByStructure)[0] ?? [];
-  const params = getOrganParameters("Parotid", "lkb_loglogit")!;
-  const ntcp = performCalculation(
-    {
-      dvh,
-      totalDose: 54,
-      numFractions: 30,
-      organ: "Parotid",
-      structureType: "oar",
-      model: "lkb_loglogit",
-      cancerSite: "HN",
-    },
-    params,
-  );
-  console.log("\n2. Single OAR NTCP (PT001 Parotid)");
-  console.log(`   NTCP ${((ntcp.ntcp ?? 0) * 100).toFixed(1)}%`);
+  if (fs.existsSync(PAROTID)) {
+    const parotidDvh = parseCSVDVH(fs.readFileSync(PAROTID, "utf8"), "PT001_Parotid.csv");
+    const dvh = Object.values(parotidDvh.dvhByStructure)[0] ?? [];
+    const params = getOrganParameters("Parotid", "lkb_loglogit")!;
+    const ntcp = performCalculation(
+      {
+        dvh,
+        totalDose: 54,
+        numFractions: 30,
+        organ: "Parotid",
+        structureType: "oar",
+        model: "lkb_loglogit",
+        cancerSite: "HN",
+      },
+      params,
+    );
+    console.log("\n2. Single OAR NTCP (PT001 Parotid)");
+    console.log(`   NTCP ${((ntcp.ntcp ?? 0) * 100).toFixed(1)}%`);
+  }
 
   const bundle = {
     patientInfo: merged.patientInfo,
@@ -90,7 +81,9 @@ async function main() {
   console.log("\n3. Web app: http://localhost:8081");
   console.log(`   Paste in browser console after load:`);
   console.log(`   sessionStorage.setItem("${sessionKey}", ${JSON.stringify(sessionJson)});`);
-  console.log(`   location.href="/calculation-setup?dvhSessionId=${sessionId}&fileName=KASTOORI_composite";`);
+  console.log(
+    `   location.href="/calculation-setup?dvhSessionId=${sessionId}&fileName=${HN_PREFIX}_composite";`,
+  );
   console.log("\nDemo API checks OK.");
 }
 

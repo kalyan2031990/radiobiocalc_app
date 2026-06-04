@@ -9,7 +9,7 @@ Legacy **pilot APK** (all features on server) is deprecated — use this mobile 
 Log in once: `eas login` ([expo.dev](https://expo.dev)).
 
 ```powershell
-cd C:\Users\Sampa\OneDrive\Desktop\radiobiocalc_app
+cd path\to\radiobiocalc_app
 npm install -g eas-cli
 ```
 

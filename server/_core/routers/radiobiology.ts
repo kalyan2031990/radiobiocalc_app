@@ -261,7 +261,7 @@ export const radiobiologyRouter = router({
       return { success: true as const, data };
     }),
 
-  /** Dev/demo: KASTOORI PTV + parotid composite from rbgyanx_test_data. */
+  /** Dev/demo: HN composite DVH from RBGYANX_TEST_DATA (see loadKastooriDemoPlan). */
   getDemoKastooriPlan: publicProcedure.query(() => {
     try {
       const demo = loadKastooriDemoPlan();

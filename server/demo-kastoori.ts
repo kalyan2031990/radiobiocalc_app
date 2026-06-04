@@ -1,5 +1,5 @@
 /**
- * Loads KASTOORI composite DVH (PTV + parotid) from rbgyanx_test_data for dev demos.
+ * Loads optional HN demo composite DVH (PTV + parotid) from RBGYANX_TEST_DATA for dev demos.
  */
 
 import fs from "fs";
@@ -11,9 +11,15 @@ import {
   DEMO_PLAN_FILE_LABEL,
 } from "./anonymize-dvh";
 
-const DEFAULT_ROOT =
-  process.env.RBGYANX_TEST_DATA ??
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\rbgyanx_test_data";
+function testDataRoot(): string {
+  const root = process.env.RBGYANX_TEST_DATA?.trim();
+  if (!root) {
+    throw new Error(
+      "Set RBGYANX_TEST_DATA to a directory containing anonymised demo DVH files (PTV_data, HN57_OAR_Eclipse).",
+    );
+  }
+  return root;
+}
 
 export type DemoKastooriPayload = {
   bundle: DVHData;
@@ -25,9 +31,10 @@ export type DemoKastooriPayload = {
 };
 
 export function loadKastooriDemoPlan(): DemoKastooriPayload {
-  const root = DEFAULT_ROOT;
-  const ptvPath = path.join(root, "PTV_data", "KASTOORI_PTV70.txt");
-  const oarPath = path.join(root, "HN57_OAR_Eclipse", "KASTOORI_COM_PRTD.txt");
+  const root = testDataRoot();
+  const prefix = process.env.RBGYANX_HN_DEMO_PREFIX?.trim() || "DEMO";
+  const ptvPath = path.join(root, "PTV_data", `${prefix}_PTV70.txt`);
+  const oarPath = path.join(root, "HN57_OAR_Eclipse", `${prefix}_COM_PRTD.txt`);
 
   if (!fs.existsSync(ptvPath) || !fs.existsSync(oarPath)) {
     throw new Error(

@@ -5,13 +5,9 @@ import { parseCSVDVH } from "../server/data-handler";
 import { evaluateCompositePlan } from "../server/composite-plan-evaluation";
 import * as fs from "fs";
 import * as path from "path";
+import { getRbgyanxTestDataRoot } from "./test-data-root";
 
-const testRoot =
-  process.env.RBGYANX_TEST_DATA ??
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\rbgyanx_test_data";
-
-const HN_REAL_PTV = path.join(testRoot, "PTV_data", "KASTOORI_PTV70.txt");
-const HN_REAL_OAR = path.join(testRoot, "HN57_OAR_Eclipse", "KASTOORI_COM_PRTD.txt");
+const HN_PREFIX = process.env.RBGYANX_HN_DEMO_PREFIX?.trim() || "DEMO";
 
 function findPair(dir: string): { ptv: string; oar: string } | null {
   const files = fs.readdirSync(dir).filter((f) => /\.(csv|txt)$/i.test(f));
@@ -27,13 +23,21 @@ function findPair(dir: string): { ptv: string; oar: string } | null {
 }
 
 async function main() {
+  const testRoot = getRbgyanxTestDataRoot();
+  if (!testRoot) {
+    console.log("SKIP composite plan test: set RBGYANX_TEST_DATA.");
+    process.exit(0);
+  }
+  const hnRealPtv = path.join(testRoot, "PTV_data", `${HN_PREFIX}_PTV70.txt`);
+  const hnRealOar = path.join(testRoot, "HN57_OAR_Eclipse", `${HN_PREFIX}_COM_PRTD.txt`);
+
   let ok = 0;
   let fail = 0;
 
   let pair: { ptv: string; oar: string } | null = null;
-  if (fs.existsSync(HN_REAL_PTV) && fs.existsSync(HN_REAL_OAR)) {
-    pair = { ptv: HN_REAL_PTV, oar: HN_REAL_OAR };
-    console.log("Using real HN patient KASTOORI (PTV70 + combined parotid)\n");
+  if (fs.existsSync(hnRealPtv) && fs.existsSync(hnRealOar)) {
+    pair = { ptv: hnRealPtv, oar: hnRealOar };
+    console.log(`Using real HN demo (${HN_PREFIX} PTV70 + combined parotid)\n`);
   } else {
     const hnDir = path.join(testRoot, "HN");
     pair = fs.existsSync(hnDir) ? findPair(hnDir) : null;
@@ -72,7 +76,7 @@ async function main() {
       totalDose: 70,
       numFractions: 35,
       cancerSite: "HN",
-      fileHint: "KASTOORI",
+      fileHint: HN_PREFIX,
     });
     const hasTcp = ev.structureResults.some((s) => s.tcp != null);
     const hasNtcp = ev.structureResults.some((s) => s.ntcp != null && s.ntcp > 0);

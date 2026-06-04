@@ -15,12 +15,13 @@ import {
 import { getOrganParameters } from "../server/parameters";
 import { mapToLiteratureOrgan } from "../lib/plan-evaluation";
 
-const TCP_DIR =
-  process.env.TCP_DVH_DIR ??
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\input_data\\tcp_only_input\\PTV_DVH_TCP_input";
-const NTCP_DIR =
-  process.env.NTCP_DVH_DIR ??
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\input_data\\ntcp_only_input\\OAR_DVH_NTCP_input";
+function optionalDir(envKey: string): string | null {
+  const v = process.env[envKey]?.trim();
+  return v && fs.existsSync(v) ? v : null;
+}
+
+const TCP_DIR = optionalDir("TCP_DVH_DIR");
+const NTCP_DIR = optionalDir("NTCP_DVH_DIR");
 
 type Row = {
   file: string;
@@ -153,6 +154,12 @@ function summarize(rows: Row[]) {
 }
 
 function main() {
+  if (!TCP_DIR || !NTCP_DIR) {
+    console.log(
+      "SKIP real DVH TCP/NTCP test: set TCP_DVH_DIR and NTCP_DVH_DIR to Eclipse export folders.",
+    );
+    process.exit(0);
+  }
   const tcpFiles = listTxt(TCP_DIR);
   const ntcpFiles = listTxt(NTCP_DIR);
 

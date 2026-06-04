@@ -13,19 +13,25 @@ import {
   targetDoseMetricsRows,
 } from "../lib/dose-metrics-guidelines";
 
-const ROOT =
-  process.env.RBGYANX_TEST_DATA ??
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\rbgyanx_test_data";
+import { getRbgyanxTestDataRoot } from "./test-data-root";
 
+const ROOT = getRbgyanxTestDataRoot();
+
+const hnPrefix = process.env.RBGYANX_HN_DEMO_PREFIX?.trim() || "DEMO";
 const samples = [
   "HN57_dDVH_CSV/PT001_Parotid.csv",
-  "HN57_OAR_Eclipse/KASTOORI_COM_PRTD.txt",
+  `HN57_OAR_Eclipse/${hnPrefix}_COM_PRTD.txt`,
   "HN57_OAR_Eclipse/PT001_Spinal Cord.txt",
-  "PTV_data/KASTOORI_PTV70.txt",
+  `PTV_data/${hnPrefix}_PTV70.txt`,
 ];
 
 let pass = 0;
 let fail = 0;
+
+if (!ROOT) {
+  console.log("SKIP clinical consistency: set RBGYANX_TEST_DATA for optional DVH file tests.");
+  process.exit(0);
+}
 
 for (const rel of samples) {
   const full = path.join(ROOT, rel);

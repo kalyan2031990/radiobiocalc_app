@@ -14,15 +14,7 @@ import {
   getClinicalFieldsForContext,
   defaultNtcpEndpointForOrgan,
 } from "../lib/clinical-fields-schema";
-
-const HN_ROOT =
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\rbgyanx_test_data";
-const PTV_DIR = path.join(HN_ROOT, "PTV_data");
-const CORD_FILE = path.join(
-  HN_ROOT,
-  "HN57_OAR_Eclipse",
-  "PT001_Spinal Cord.txt"
-);
+import { getRbgyanxTestDataRoot } from "./test-data-root";
 
 type SiteResult = {
   site: string;
@@ -111,20 +103,28 @@ function calcNtcp(
   };
 }
 
-function pickCordFile(): string {
-  if (fs.existsSync(CORD_FILE)) return CORD_FILE;
-  const dir = path.join(HN_ROOT, "HN57_OAR_Eclipse");
+function pickCordFile(hnRoot: string, cordDefault: string): string {
+  if (fs.existsSync(cordDefault)) return cordDefault;
+  const dir = path.join(hnRoot, "HN57_OAR_Eclipse");
   const hit = fs
     .readdirSync(dir)
     .find((f) => /cord/i.test(f) && f.endsWith(".txt"));
-  return hit ? path.join(dir, hit) : CORD_FILE;
+  return hit ? path.join(dir, hit) : cordDefault;
 }
 
 function main() {
+  const hnRoot = getRbgyanxTestDataRoot();
+  if (!hnRoot) {
+    console.log("SKIP multi-site smoke: set RBGYANX_TEST_DATA.");
+    process.exit(0);
+  }
+  const ptvDir = path.join(hnRoot, "PTV_data");
+  const cordDefault = path.join(hnRoot, "HN57_OAR_Eclipse", "PT001_Spinal Cord.txt");
+
   console.log("=== Multi-site smoke (real HN DVH + site-specific context) ===\n");
 
-  const ptvFiles = fs.readdirSync(PTV_DIR).filter((f) => /\.txt$/i.test(f));
-  const cordPath = pickCordFile();
+  const ptvFiles = fs.readdirSync(ptvDir).filter((f) => /\.txt$/i.test(f));
+  const cordPath = pickCordFile(hnRoot, cordDefault);
   const cordExists = fs.existsSync(cordPath);
 
   console.log(`Real PTV patients (HN plans): ${ptvFiles.length} in PTV_data`);
@@ -139,7 +139,7 @@ function main() {
 
     const ptvFile = ptvFiles[0];
     if (ptvFile) {
-      const { dvh } = loadDvh(path.join(PTV_DIR, ptvFile));
+      const { dvh } = loadDvh(path.join(ptvDir, ptvFile));
       if (dvh.length > 0) {
         row.tcp = calcTcp(dvh, targetOrgan, site.id, ptvFile) ?? undefined;
       }

@@ -10,10 +10,9 @@ import { performCalculation } from "../server/radiobiology";
 import { getOrganParameters } from "../server/parameters";
 import { mapToLiteratureOrgan } from "../lib/plan-evaluation";
 import { calculateNTCP_LKB_LogLogit } from "../server/radiobiology";
+import { getRbgyanxTestDataRoot } from "./test-data-root";
 
-const ROOT =
-  process.env.RBGYANX_TEST_DATA ??
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\rbgyanx_test_data";
+const ROOT = getRbgyanxTestDataRoot();
 
 const SKIP_DIRS = new Set([
   "_integration_test_output",
@@ -54,8 +53,8 @@ function walk(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-function runOne(filePath: string): Row {
-  const rel = path.relative(ROOT, filePath);
+function runOne(filePath: string, root: string): Row {
+  const rel = path.relative(root, filePath);
   const base = path.basename(filePath);
   try {
     const content = fs.readFileSync(filePath, "utf8");
@@ -144,13 +143,17 @@ function runOne(filePath: string): Row {
 }
 
 function main() {
+  if (!ROOT) {
+    console.log("SKIP rbgyanx_test_data suite: set RBGYANX_TEST_DATA.");
+    process.exit(0);
+  }
   console.log("=== rbGyanX mobile — rbgyanx_test_data suite ===\n");
   console.log(`Root: ${ROOT}\n`);
 
   const files = walk(ROOT);
   console.log(`DVH files found: ${files.length}\n`);
 
-  const rows = files.map(runOne);
+  const rows = files.map((f) => runOne(f, ROOT));
   const parsed = rows.filter((r) => !r.error);
   const failed = rows.filter((r) => r.error);
   const unmapped = failed.filter((r) => r.error?.includes("Unmapped"));

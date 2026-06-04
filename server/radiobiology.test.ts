@@ -22,8 +22,9 @@ describe("LKB log-logistic cross-check (desktop formula)", () => {
 
 describe("BED / EQD2", () => {
   it("70 Gy in 35 fx, alpha/beta=3", () => {
-    expect(calculateBED(70, 35, 3)).toBeCloseTo(70 * (1 + 2 / 3), 4);
-    expect(calculateEQD2(70, 35, 3)).toBeCloseTo(70 * (1 + 2 / 3) / (1 + 2 / 2), 4);
+    const dpf = 70 / 35;
+    expect(calculateBED(70, 35, 3)).toBeCloseTo(70 * (1 + dpf / 3), 4);
+    expect(calculateEQD2(70, 35, 3)).toBeCloseTo(70 * ((3 + dpf) / (3 + 2)), 4);
   });
 });
 

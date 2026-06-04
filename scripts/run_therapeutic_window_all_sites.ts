@@ -1,6 +1,6 @@
 /**
  * TCP / NTCP / therapeutic window per cancer site.
- * HN: real patient DVH (KASTOORI PTV + parotid). Other sites: synthetic composite DVH.
+ * HN: optional real demo DVH under RBGYANX_TEST_DATA. Other sites: synthetic composite DVH.
  *
  * Usage: npx tsx scripts/run_therapeutic_window_all_sites.ts
  */
@@ -13,13 +13,17 @@ import { performCalculation } from "../server/radiobiology";
 import { getOrganParameters } from "../server/parameters";
 import { CANCER_SITES, type CancerSiteId } from "../server/sites-registry";
 
-const HN_ROOT =
-  process.env.RBGYANX_TEST_DATA ??
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\rbgyanx_test_data";
+import { getRbgyanxTestDataRoot } from "./test-data-root";
 
-const HN_PATIENT = "KASTOORI";
-const HN_PTV = path.join(HN_ROOT, "PTV_data", `${HN_PATIENT}_PTV70.txt`);
-const HN_OAR = path.join(HN_ROOT, "HN57_OAR_Eclipse", `${HN_PATIENT}_COM_PRTD.txt`);
+const HN_ROOT = getRbgyanxTestDataRoot();
+/** Basename prefix for optional real HN demo files under RBGYANX_TEST_DATA (not committed). */
+const HN_DEMO_PREFIX = process.env.RBGYANX_HN_DEMO_PREFIX ?? "DEMO";
+const HN_PTV = HN_ROOT
+  ? path.join(HN_ROOT, "PTV_data", `${HN_DEMO_PREFIX}_PTV70.txt`)
+  : "";
+const HN_OAR = HN_ROOT
+  ? path.join(HN_ROOT, "HN57_OAR_Eclipse", `${HN_DEMO_PREFIX}_COM_PRTD.txt`)
+  : "";
 
 type SiteReport = {
   site: CancerSiteId;
@@ -117,7 +121,7 @@ function runSite(siteId: CancerSiteId): SiteReport {
     if (real) {
       bundle = real;
       dataSource = "real";
-      patient = HN_PATIENT;
+      patient = `HN_DEMO_${HN_DEMO_PREFIX}`;
     }
   }
 
@@ -172,6 +176,7 @@ function runSite(siteId: CancerSiteId): SiteReport {
 
 function runSingleStructureSanity() {
   console.log("\n--- Single-structure sanity (HN real parotid NTCP) ---");
+  if (!HN_ROOT) return;
   const parotid = path.join(HN_ROOT, "HN57_dDVH_CSV", "PT001_Parotid.csv");
   if (!fs.existsSync(parotid)) {
     console.log("SKIP PT001_Parotid.csv missing");
@@ -200,9 +205,9 @@ function runSingleStructureSanity() {
 
 function main() {
   console.log("=== Therapeutic window — all sites (real HN + synthetic) ===\n");
-  console.log(`Data root: ${HN_ROOT}`);
+  console.log(`Data root: ${HN_ROOT ?? "(unset — synthetic only)"}`);
   console.log(
-    `HN real plan: ${fs.existsSync(HN_PTV) && fs.existsSync(HN_OAR) ? `${HN_PATIENT} PTV+Parotid` : "unavailable — synthetic fallback"}\n`,
+    `HN real plan: ${HN_ROOT && fs.existsSync(HN_PTV) && fs.existsSync(HN_OAR) ? `${HN_DEMO_PREFIX} PTV+Parotid` : "unavailable — synthetic fallback"}\n`,
   );
 
   const reports: SiteReport[] = [];
