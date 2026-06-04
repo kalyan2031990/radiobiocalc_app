@@ -129,6 +129,26 @@ export const BENCHMARK_DATABASE: Record<string, BenchmarkValue> = {
     source: "QUANTEC",
     year: 2010,
   },
+  "Liver_LKB": {
+    organName: "Liver",
+    modelType: "LKB Log-Logistic",
+    tcpTarget: 0.85,
+    ntcpLimit: 0.1,
+    therapeuticWindowMin: 0.75,
+    therapeuticWindowMax: 0.95,
+    source: "QUANTEC",
+    year: 2010,
+  },
+  "Kidney_LKB": {
+    organName: "Kidney",
+    modelType: "LKB Log-Logistic",
+    tcpTarget: 0.88,
+    ntcpLimit: 0.12,
+    therapeuticWindowMin: 0.76,
+    therapeuticWindowMax: 0.96,
+    source: "QUANTEC",
+    year: 2010,
+  },
 
   // PROSTATE
   "Prostate_LKB": {

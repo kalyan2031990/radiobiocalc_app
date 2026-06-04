@@ -19,6 +19,7 @@ import {
   type TherapeuticWindowResult,
   type OarNtcpEntry,
 } from "../lib/therapeutic-window";
+import { resolveCancerSite } from "../lib/infer-cancer-site";
 
 export type StructureEvalResult = {
   structureName: string;
@@ -102,10 +103,16 @@ export function evaluateCompositePlan(
     ntcpModel?: CalculationRequest["model"];
   },
 ): CompositePlanEvaluation {
+  const structureNames = data.structures.map((s) => s.name);
+  const { siteId: resolvedSite } = resolveCancerSite(
+    options.cancerSite,
+    structureNames,
+    options.fileHint ?? data.patientInfo?.patientName ?? "",
+  );
   const {
     totalDose,
     numFractions,
-    cancerSite = "HN",
+    cancerSite = resolvedSite,
     technique = "IMRT",
     prescriptionGy = totalDose,
     fileHint = data.patientInfo?.patientName ?? "",

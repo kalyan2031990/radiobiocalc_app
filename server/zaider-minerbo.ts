@@ -1,6 +1,10 @@
 /**
  * Zaider–Minerbo stochastic TCP (Zaider & Minerbo, Int J Radiat Oncol Biol Phys 1995).
  * TCP = P0(t_obs)^N_eff  where P0 is single-cell extinction probability.
+ *
+ * NOTE: N_eff uses the Poisson repopulation DVH integral (common clinical approximation).
+ * The full ZM model integrates the birth–death process during delivery; document this
+ * when comparing to rigorous ZM or experimental data.
  * Ported from engine/radiobiology/zaider_minerbo.py
  */
 

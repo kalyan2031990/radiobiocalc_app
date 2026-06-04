@@ -48,6 +48,15 @@ export default function ProductInfoScreen() {
             {APP_TAGLINE}
           </Text>
 
+          <Section title="Clinical presets vs TCP/NTCP" colors={colors}>
+            <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
+              Optional fields (age, BMI, HPV, smoking, concurrent chemo, etc.) support MDT
+              traceability and future multivariable adjustment (py_ntcpx-style). They do not
+              change dose–response math today — only DVH and literature LQ parameters do.
+              See docs/GAP_AUDIT.md.
+            </Text>
+          </Section>
+
           <Section title="Intended use" colors={colors}>
             <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
               {INTENDED_USE.short}

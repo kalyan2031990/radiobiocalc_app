@@ -72,6 +72,14 @@ export const CLINICAL_FIELD_DEFINITIONS: ClinicalFieldDefinition[] = [
     roles: "both",
     section: "patient",
   },
+  {
+    id: "bmi",
+    label: "BMI (kg/m²)",
+    type: "text",
+    placeholder: "e.g. 24.5",
+    roles: "both",
+    section: "patient",
+  },
 
   // ── Disease / site (both, site-filtered) ──
   {

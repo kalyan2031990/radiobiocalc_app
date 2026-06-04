@@ -40,6 +40,7 @@ import {
   defaultModelForRole,
 } from "@/lib/structure-role";
 import { analyzePlanScope } from "@/lib/plan-scope";
+import { inferCancerSiteFromStructureNames } from "@/lib/infer-cancer-site";
 
 interface Organ {
   name: string;
@@ -141,7 +142,7 @@ export default function CalculationSetupScreen() {
   const [structureType, setStructureType] = useState<"target" | "oar">("oar");
   const [totalDose, setTotalDose] = useState("70");
   const [numFractions, setNumFractions] = useState("35");
-  const [cancerSite, setCancerSite] = useState("HN");
+  const [cancerSite, setCancerSite] = useState("UNKNOWN");
   const [technique, setTechnique] = useState("IMRT");
   const [targetType, setTargetType] = useState("PTV");
   const [selectedModel, setSelectedModel] = useState<ModelId>("lkb_loglogit");
@@ -299,6 +300,15 @@ export default function CalculationSetupScreen() {
   }, [siteOrgansQuery.data, organsQuery.data, structureType]);
 
   useEffect(() => {
+    if (dvhBundle && cancerSite === "UNKNOWN") {
+      const inferred = inferCancerSiteFromStructureNames(
+        fileStructures,
+        importedFileName,
+      );
+      if (inferred.siteId !== "UNKNOWN" && inferred.confidence === "high") {
+        setCancerSite(inferred.siteId);
+      }
+    }
     setOrgans(organList);
     if (!organList.find((o) => o.name === selectedOrgan) && organList[0]) {
       setSelectedOrgan(organList[0].name);
@@ -480,9 +490,14 @@ export default function CalculationSetupScreen() {
       return sitesQuery.data.data as { id: string; label: string }[];
     }
     return [
+      { id: "UNKNOWN", label: "Select cancer site (required)" },
       { id: "HN", label: "Head & Neck" },
       { id: "LUNG", label: "Lung" },
       { id: "BREAST", label: "Breast" },
+      { id: "PROSTATE", label: "Prostate" },
+      { id: "RECTUM", label: "Rectum" },
+      { id: "CERVIX", label: "Cervix" },
+      { id: "BRAIN", label: "Brain" },
     ];
   }, [sitesQuery.data]);
 

@@ -158,13 +158,13 @@ export function calculateGEUD(
   aParameter: number = 1
 ): number {
   if (dvh.length === 0) {
-    return 0;
+    return NaN;
   }
 
-  // Normalize volumes to relative volumes (0-1)
-  const totalVolume = Math.max(...dvh.map((p) => p.volume));
+  // Differential DVH: bin volumes should sum to total mass (normalize if rebinning drift)
+  const totalVolume = dvh.reduce((s, p) => s + Math.max(0, p.volume), 0);
   if (totalVolume <= 0) {
-    return 0;
+    return NaN;
   }
 
   const relativeVolumes = dvh.map((p) => p.volume / totalVolume);
@@ -227,37 +227,29 @@ export function calculateEUD(
  * Calculate comprehensive dose metrics from DVH
  */
 export function calculateDoseMetrics(dvh: DVHPoint[]): DoseMetrics {
+  const empty: DoseMetrics = {
+    meanDose: NaN,
+    maxDose: NaN,
+    minDose: NaN,
+    totalVolume: 0,
+    gEUD: NaN,
+    eud: NaN,
+    vxx: {},
+    dxx: {},
+  };
   if (dvh.length === 0) {
-    return {
-      meanDose: 0,
-      maxDose: 0,
-      minDose: 0,
-      totalVolume: 0,
-      gEUD: 0,
-      eud: 0,
-      vxx: {},
-      dxx: {},
-    };
+    return empty;
   }
 
-  // Sort by dose
+  // Sort by dose (expects differential bins after toDifferentialDVH in performCalculation)
   const sortedDVH = [...dvh].sort((a, b) => a.dose - b.dose);
 
   const doses = sortedDVH.map((p) => p.dose);
-  const volumes = sortedDVH.map((p) => p.volume);
-  const totalVolume = Math.max(...volumes);
+  const volumes = sortedDVH.map((p) => Math.max(0, p.volume));
+  const totalVolume = volumes.reduce((s, v) => s + v, 0);
 
   if (totalVolume <= 0) {
-    return {
-      meanDose: 0,
-      maxDose: 0,
-      minDose: 0,
-      totalVolume: 0,
-      gEUD: 0,
-      eud: 0,
-      vxx: {},
-      dxx: {},
-    };
+    return empty;
   }
 
   const relativeVolumes = volumes.map((v) => v / totalVolume);
@@ -267,12 +259,15 @@ export function calculateDoseMetrics(dvh: DVHPoint[]): DoseMetrics {
   const minDose = Math.min(...doses.filter((d) => d > 0));
   const meanDose = relativeVolumes.reduce((sum, vi, i) => sum + vi * doses[i], 0);
 
-  // Calculate Vxx (% volume receiving >= xx Gy)
+  // Vxx on differential DVH: sum bin fractions with dose >= threshold
   const vxx: Record<number, number> = {};
   for (let doseLevel = 5; doseLevel <= 70; doseLevel += 5) {
     if (doseLevel <= maxDose) {
-      const volumeAtDose = interpolate(doses, relativeVolumes, doseLevel);
-      vxx[doseLevel] = volumeAtDose * 100;
+      let volAtLeast = 0;
+      for (let i = 0; i < sortedDVH.length; i++) {
+        if (doses[i] >= doseLevel) volAtLeast += volumes[i];
+      }
+      vxx[doseLevel] = (volAtLeast / totalVolume) * 100;
     } else {
       vxx[doseLevel] = 0;
     }
@@ -557,8 +552,35 @@ export function performCalculation(
 
   const dvhDiff = toDifferentialDVH(request.dvh);
 
+  if (dvhDiff.length === 0) {
+    return {
+      organ: request.organ,
+      model: request.model,
+      bed: 0,
+      eqd2: 0,
+      doseMetrics: calculateDoseMetrics([]),
+      parameters: params,
+      timestamp: new Date().toISOString(),
+      cancerSite: request.cancerSite,
+      technique: request.technique,
+    };
+  }
+
   // Calculate dose metrics
   const doseMetrics = calculateDoseMetrics(dvhDiff);
+  if (!Number.isFinite(doseMetrics.gEUD) || doseMetrics.totalVolume <= 0) {
+    return {
+      organ: request.organ,
+      model: request.model,
+      bed: calculateBED(request.totalDose, request.numFractions, params.alphaBeta),
+      eqd2: calculateEQD2(request.totalDose, request.numFractions, params.alphaBeta),
+      doseMetrics,
+      parameters: params,
+      timestamp: new Date().toISOString(),
+      cancerSite: request.cancerSite,
+      technique: request.technique,
+    };
+  }
   const aExp = request.geudExponent ?? 1;
   if (aExp !== 1) {
     doseMetrics.gEUD = calculateGEUD(dvhDiff, aExp);
