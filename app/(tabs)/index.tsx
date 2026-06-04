@@ -195,7 +195,7 @@ export default function HomeScreen() {
                       className="text-sm text-muted"
                       style={{ color: colors.muted }}
                     >
-                      TPS export (.csv / .txt)
+                      Same DVH export as QUANTEC checks in Excel (.csv / .txt)
                     </Text>
                   </View>
                   <MaterialIcons

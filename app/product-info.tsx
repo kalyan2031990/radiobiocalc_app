@@ -57,6 +57,14 @@ export default function ProductInfoScreen() {
             </Text>
           </Section>
 
+          <Section title="DVH import" colors={colors}>
+            <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
+              Import the same DVH export you would use for QUANTEC checks in Excel; future
+              releases may pull plans from your institution&apos;s planning server without manual
+              file transfer.
+            </Text>
+          </Section>
+
           <Section title="Intended use" colors={colors}>
             <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
               {INTENDED_USE.short}

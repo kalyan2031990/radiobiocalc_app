@@ -201,9 +201,12 @@ export default function DVHInputScreen() {
                 </Text>
               </View>
             </Pressable>
-            <Text className="text-sm" style={{ color: colors.muted }}>
-              TPS export (.csv / .txt), 3-column composite CSV (dose, volume, structure), or
-              multi-select files (PTV + OARs). API: {getApiBaseUrl()}
+            <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
+              Import the same DVH export you would use for QUANTEC checks in Excel; future
+              releases may pull plans from your institution&apos;s planning server without manual
+              file transfer. Formats: TPS .csv / .txt, composite 3-column CSV, or multi-select
+              (PTV + OARs).
+              {!isOfflineBuild() ? ` API: ${getApiBaseUrl()}` : ""}
             </Text>
           </View>
 

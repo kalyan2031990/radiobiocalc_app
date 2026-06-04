@@ -45,11 +45,23 @@ Alias: `npm run build:offline-apk` = same Android profile.
 
 Calculations, DVH import, and composite therapeutic window **do not** use this URL.
 
+## DVH import (pilot workflow)
+
+Import the same DVH export you would use for QUANTEC checks in Excel; future releases may pull plans from your institution’s planning server without manual file transfer.
+
+**Today:** export from your TPS (Eclipse, RayStation, Monaco, etc.) as `.csv` or `.txt`, then open the file on the phone (email, cloud drive, USB — follow your institution’s PHI policy). **Not yet:** direct wireless link to the TPS or automatic plan pull from a hospital planning server.
+
+**Tips for testers**
+
+- Use the **same structure names** your TPS export uses (PTV, parotids, cord, etc.).
+- One **approved plan** per session; re-import if the plan is revised.
+- Calculations run **offline** after import; only PDF/DOCX export may need the optional server URL.
+
 ## Tester flow
 
 1. Install **rbGyanX Mobile** (Android APK or iOS build).
 2. Accept disclaimer → self-test should pass **offline engine** (export server check is optional).
-3. Import DVH → run calculations (works in airplane mode).
+3. Import DVH (TPS file export) → run calculations (works in airplane mode).
 4. For reports: set export server URL if not done → open **Export report** → PDF / DOCX.
 
 ## Verify engine on PC
