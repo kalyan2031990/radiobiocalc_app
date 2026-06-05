@@ -36,11 +36,21 @@ export const API_BASE_URL = env.apiBaseUrl;
  * API base URL. Offline/mobile builds use network only for PDF/DOCX export —
  * set via Home → Report export server (stored override). No default LAN IP.
  */
+/** Absolute URL for tRPC only — native fetch rejects relative paths like `/api/trpc`. */
+export const OFFLINE_TRPC_STUB = "http://127.0.0.1:9";
+
 export function getApiBaseUrl(): string {
   const override = getPilotApiOverride();
   if (override) return override;
   if (isOfflineBuild()) return "";
   return resolveApiBaseUrl(API_BASE_URL);
+}
+
+export function getTrpcHttpUrl(): string {
+  const base = getApiBaseUrl();
+  if (base) return `${base.replace(/\/$/, "")}/api/trpc`;
+  if (isOfflineBuild()) return `${OFFLINE_TRPC_STUB}/api/trpc`;
+  return `${resolveApiBaseUrl(API_BASE_URL).replace(/\/$/, "")}/api/trpc`;
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";

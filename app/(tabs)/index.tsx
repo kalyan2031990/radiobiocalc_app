@@ -109,7 +109,7 @@ export default function HomeScreen() {
                       <View className="flex-row items-center gap-2 flex-1">
                         <MaterialIcons name="cloud-upload" size={22} color="#1D4ED8" />
                         <Text style={{ color: "#1E3A8A", fontWeight: "600", fontSize: 13, flex: 1 }}>
-                          Report export server (PDF/DOCX)
+                          Export server (optional)
                         </Text>
                       </View>
                       <MaterialIcons name="chevron-right" size={22} color="#1D4ED8" />

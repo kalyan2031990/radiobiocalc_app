@@ -26,8 +26,13 @@
     "build:offline-apk": "eas build -p android --profile offline --non-interactive",
     "build:mobile-apk": "eas build -p android --profile offline --non-interactive",
     "build:mobile-ios": "eas build -p ios --profile offline --non-interactive",
+    "build:mobile-all": "eas build -p android --profile offline --non-interactive && eas build -p ios --profile offline --non-interactive",
     "test:offline-engine": "tsx scripts/run_offline_engine_test.ts",
-    "test:ci": "npm run test:offline-engine && npm run test:phase2a && npm run test:phase2b && vitest run",
+    "test:report-export": "tsx scripts/run_report_export_test.ts",
+    "test:ci": "npm run test:offline-engine && npm run test:report-export && npm run test:phase2a && npm run test:phase2b && vitest run",
+    "build:android:local": "cross-env EXPO_PUBLIC_OFFLINE_BUILD=1 expo prebuild --platform android && cd android && gradlew.bat assembleRelease",
+    "build:android:local:clean": "cross-env EXPO_PUBLIC_OFFLINE_BUILD=1 expo prebuild --platform android --clean && cd android && gradlew.bat assembleRelease",
+    "clean:expo-cache": "node -e \"const fs=require('fs');['.expo','dist','web-build'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true});console.log('removed',d)}catch(e){}})\"",
     "build:ios": "eas build -p ios --profile preview",
     "prebuild": "expo prebuild --clean",
     "qr": "node scripts/generate_qr.mjs"
@@ -58,8 +63,10 @@
     "expo-keep-awake": "~15.0.8",
     "expo-linking": "~8.0.10",
     "expo-notifications": "~0.32.15",
+    "expo-print": "~15.0.8",
     "expo-router": "~6.0.19",
     "expo-secure-store": "~15.0.8",
+    "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.12",
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",
@@ -86,7 +93,6 @@
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",
-    "@rollup/rollup-win32-x64-msvc": "^4.61.0",
     "@types/cookie": "^0.6.0",
     "@types/express": "^4.17.25",
     "@types/node": "^22.19.3",
@@ -105,7 +111,6 @@
     "typescript": "~5.9.3",
     "vitest": "^2.1.9"
   },
-  "packageManager": "pnpm@9.12.0",
   "optionalDependencies": {
     "lightningcss-win32-x64-msvc": "^1.32.0"
   }
