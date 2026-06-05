@@ -54,6 +54,19 @@ function isEclipseTxt(content: string): boolean {
   );
 }
 
+/** Avoid Math.max(...arr) stack overflows on Hermes with large TPS DVHs. */
+function dvhDoseRange(dvh: DVHPoint[]): { min: number; max: number } {
+  if (dvh.length === 0) return { min: 0, max: 0 };
+  let min = dvh[0].dose;
+  let max = dvh[0].dose;
+  for (let i = 1; i < dvh.length; i++) {
+    const d = dvh[i].dose;
+    if (d < min) min = d;
+    if (d > max) max = d;
+  }
+  return { min, max };
+}
+
 /**
  * Parse Varian Eclipse exported .txt DVH (matches desktop rbGyanX parser behaviour).
  */
@@ -289,7 +302,7 @@ export function parseCSVDVH(
 
   // Heuristic: raw cGy values without header (common in TPS CSV exports)
   if (doseUnit === "Gy") {
-    const maxD = Math.max(...dvhPoints.map((p) => p.dose));
+    const { max: maxD } = dvhDoseRange(dvhPoints);
     if (maxD > 150) {
       for (const p of dvhPoints) {
         p.dose = p.dose / 100;
@@ -385,7 +398,7 @@ function buildMultiStructureDvhData(
   for (const [name, raw] of byStructure) {
     if (raw.length === 0) continue;
     if (doseUnit === "Gy") {
-      const maxD = Math.max(...raw.map((p) => p.dose));
+      const { max: maxD } = dvhDoseRange(raw);
       if (maxD > 150) {
         for (const p of raw) p.dose = p.dose / 100;
       }
@@ -544,8 +557,7 @@ export function validateDVH(dvh: DVHPoint[]): boolean {
   }
 
   // Check for reasonable dose range
-  const maxDose = Math.max(...dvh.map((p) => p.dose));
-  const minDose = Math.min(...dvh.map((p) => p.dose));
+  const { min: minDose, max: maxDose } = dvhDoseRange(dvh);
 
   if (maxDose > 200) {
     throw new Error("Maximum dose exceeds 200 Gy (likely incorrect unit)");
@@ -598,7 +610,7 @@ export function resampleDVH(dvh: DVHPoint[], numPoints: number = 1000): DVHPoint
   }
 
   const resampled: DVHPoint[] = [];
-  const maxDose = Math.max(...dvh.map((p) => p.dose));
+  const { max: maxDose } = dvhDoseRange(dvh);
 
   for (let i = 0; i < numPoints; i++) {
     const targetDose = (i / (numPoints - 1)) * maxDose;

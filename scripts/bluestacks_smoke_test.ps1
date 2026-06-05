@@ -21,8 +21,13 @@ $report = [ordered]@{
   logSnippets = @()
 }
 
-function Invoke-Adb([string[]]$Args) {
-  $out = & $Adb -s $Device @Args 2>&1
+function Invoke-AdbGlobal([string[]]$Cmd) {
+  $out = & $Adb @Cmd 2>&1
+  return ($out | Out-String).Trim()
+}
+
+function Invoke-Adb([string[]]$Cmd) {
+  $out = & $Adb -s $Device @Cmd 2>&1
   return ($out | Out-String).Trim()
 }
 
@@ -60,7 +65,7 @@ if (-not (Test-Path $Apk)) {
 
 $online = $false
 for ($i = 0; $i -lt 10; $i++) {
-  Invoke-Adb @("connect", $Device) | Out-Null
+  Invoke-AdbGlobal @("connect", $Device) | Out-Null
   Start-Sleep -Seconds 2
   $devices = Invoke-Adb @("devices")
   if ($devices -match [regex]::Escape($Device) + "\s+device") {

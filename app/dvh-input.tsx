@@ -9,7 +9,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
-  Platform,
+  InteractionManager,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -25,20 +25,12 @@ import { mergeDvhBundles } from "@/lib/merge-dvh-bundle";
 import { analyzePlanScope } from "@/lib/plan-scope";
 import { isOfflineBuild } from "@/lib/offline-mode";
 import { offlineMergeDvhs, offlineParseDvh } from "@/lib/offline-engine";
+import { readDocumentContent } from "@/lib/read-document-content";
 
-async function readDocumentContent(
-  asset: DocumentPicker.DocumentPickerAsset,
-): Promise<string> {
-  const webFile = (asset as DocumentPicker.DocumentPickerAsset & { file?: File })
-    .file;
-  if (Platform.OS === "web" && webFile instanceof File) {
-    return webFile.text();
-  }
-  const response = await fetch(asset.uri);
-  if (!response.ok) {
-    throw new Error(`Could not read file (HTTP ${response.status})`);
-  }
-  return response.text();
+function yieldToUi(): Promise<void> {
+  return new Promise((resolve) => {
+    InteractionManager.runAfterInteractions(() => resolve());
+  });
 }
 
 export default function DVHInputScreen() {
@@ -65,12 +57,6 @@ export default function DVHInputScreen() {
 
       const assets = pick.assets;
       setLoading(true);
-      setSelectedFile({
-        name:
-          assets.length === 1
-            ? assets[0].name
-            : `${assets.length} files (composite plan)`,
-      });
       setDVHData(null);
       setServerSessionId(null);
 
@@ -78,10 +64,19 @@ export default function DVHInputScreen() {
       const sessionIds: string[] = [];
       const fileNames: string[] = [];
 
-      for (const asset of assets) {
+      for (let i = 0; i < assets.length; i++) {
+        const asset = assets[i];
+        setSelectedFile({
+          name:
+            assets.length === 1
+              ? asset.name
+              : `${i + 1}/${assets.length}: ${asset.name}`,
+        });
+        await yieldToUi();
         const content = await readDocumentContent(asset);
         if (isOfflineBuild()) {
           parsedBundles.push(offlineParseDvh(content, asset.name));
+          await yieldToUi();
         } else {
           const result = await parseMutation.mutateAsync({
             content,
