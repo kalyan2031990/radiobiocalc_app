@@ -4,23 +4,36 @@
 
 Legacy **pilot APK** (all features on server) is deprecated — use this mobile build instead.
 
-## Build (EAS cloud)
+## Build Android APK (recommended — local, no EAS queue)
 
-Log in once: `eas login` ([expo.dev](https://expo.dev)).
+See **[docs/LOCAL_ANDROID_BUILD.md](LOCAL_ANDROID_BUILD.md)**.
 
 ```powershell
 cd path\to\radiobiocalc_app
-npm install -g eas-cli
+.\scripts\install-android-sdk.ps1
+npm install
+npm run build:android:local
 ```
 
-| Platform | Command | Install |
-|----------|---------|---------|
-| **Android APK** | `npm run build:mobile-apk` | Download APK from Expo → Builds; sideload |
-| **iOS** | `npm run build:mobile-ios` | Expo internal distribution / TestFlight per your Apple setup |
+APK: `android\app\build\outputs\apk\release\app-release.apk`
 
-App name on device: **rbGyanX Mobile** (v2.1.0).
+## Build (EAS cloud — optional)
 
-Alias: `npm run build:offline-apk` = same Android profile.
+```powershell
+eas login
+npm run build:mobile-apk
+```
+
+| Platform | Command |
+|----------|---------|
+| **Android APK** | `npm run build:mobile-apk` |
+| **iOS** | `npm run build:mobile-ios` (needs Apple Developer) |
+
+App name on device: **rbGyanX Mobile** (v2.1.1).
+
+## Reports on device
+
+PDF and DOCX are **generated and saved on the phone** (app `reports/` folder). No PC or ngrok required.
 
 ## Coordinator: export server for remote phones
 

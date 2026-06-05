@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+test-output/
+.env
+.env*.local
+server/data/email-users.json

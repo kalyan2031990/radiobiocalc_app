@@ -2,13 +2,9 @@
 import "./scripts/load-env.js";
 import type { ExpoConfig } from "expo/config";
 
-// Bundle ID format: space.manus.<project_name_dots>.<timestamp>
-// e.g., "my-app" created at 2024-01-15 10:30:45 -> "space.manus.my.app.t20240115103045"
-const bundleId = "space.manus.radiobiocalc_app.t20260101235427";
-// Extract timestamp from bundle ID and prefix with "manus" for deep link scheme
-// e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
-const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
-const schemeFromBundleId = `manus${timestamp}`;
+/** Apple/Google-safe IDs (alphanumeric, dots, hyphens only — no underscores). */
+const bundleId = "com.rbgyanx.radiobiocalc";
+const schemeFromBundleId = "rbgyanx";
 
 const env = {
   // App branding - update these values directly (do not use env vars)
@@ -33,7 +29,7 @@ const config: ExpoConfig = {
       ? "rbGyanX Pilot"
       : env.appName,
   slug: env.appSlug,
-  version: "2.1.0",
+  version: "2.1.1",
   extra: {
     offlineBuild: isOfflineBuild,
     pilotBuild: isPilotBuild,
@@ -50,9 +46,12 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
-    versionCode: 6,
+    versionCode: 7,
     /** Pilot LAN API uses http:// — required for phone → PC on Wi‑Fi */
     usesCleartextTraffic: true,
     adaptiveIcon: {

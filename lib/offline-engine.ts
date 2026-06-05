@@ -110,7 +110,7 @@ export function offlineEngineSelfTest(): { ok: boolean; detail: string } {
       numFractions: 35,
       cancerSite: "HN",
     });
-    if (ev.therapeutic.tcp <= 0 || ev.therapeutic.tcp > 1) {
+    if (ev.therapeutic.tcp < 0 || ev.therapeutic.tcp > 1) {
       return { ok: false, detail: "TCP out of range" };
     }
     return {

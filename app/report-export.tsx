@@ -1,5 +1,5 @@
 /**
- * Export analysis report — HTML (print to PDF) and DOCX-compatible text.
+ * Export analysis report — PDF and DOCX saved on device (no server required on mobile).
  */
 
 import {
@@ -9,7 +9,6 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
-  Share,
   Platform,
   Switch,
 } from "react-native";
@@ -18,31 +17,38 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useState } from "react";
-import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
 import { trpc } from "@/lib/trpc";
-import { getApiBaseUrl } from "@/constants/oauth";
-import { isOfflineBuild } from "@/lib/offline-mode";
+import { isOfflineBuild, OFFLINE_EXPORT_HINT } from "@/lib/offline-mode";
 import { buildClinicalReportSections } from "@/lib/clinical-report-sections";
 import { parseClinicalContext } from "@/lib/clinical-fields-schema";
 import { buildAnalysisReport } from "@/server/analysis-report";
+import {
+  notifyReportSaved,
+  persistReportFile,
+  saveBytesReport,
+  saveTextReport,
+  shareSavedReport,
+} from "@/lib/report-file-export";
 
-function exportServerRequiredMessage(): string {
-  return (
-    "Set the report export server on Home (PDF/DOCX only). " +
-    "For remote phones use an https ngrok URL to your PC running npm run start:server."
-  );
+/** Native apps build and store reports on-device; web may use API when online. */
+function useOnDeviceReportBuilder(): boolean {
+  if (Platform.OS === "android" || Platform.OS === "ios") return true;
+  return isOfflineBuild();
 }
 
 export default function ReportExportScreen() {
   const router = useRouter();
   const colors = useColors();
   const params = useLocalSearchParams();
+  const onDevice = useOnDeviceReportBuilder();
   const [lastHtml, setLastHtml] = useState<string | null>(null);
   const [lastDocx, setLastDocx] = useState<string | null>(null);
   const [filenameBase, setFilenameBase] = useState("rbGyanX_report");
   const [includeClinicalInReport, setIncludeClinicalInReport] = useState(
     (params.includeClinicalInReport as string) !== "0",
   );
+  const [busy, setBusy] = useState(false);
 
   const generateMutation = trpc.radiobiology.generateAnalysisReport.useMutation();
 
@@ -85,12 +91,9 @@ export default function ReportExportScreen() {
     };
   };
 
-  const buildReportOnDevice = () =>
-    isOfflineBuild() && !getApiBaseUrl();
-
   const generateReport = async () => {
     const payload = buildPayload();
-    if (buildReportOnDevice()) {
+    if (onDevice) {
       return buildAnalysisReport(payload);
     }
     try {
@@ -102,20 +105,8 @@ export default function ReportExportScreen() {
     }
   };
 
-  const ensureExportServer = (): boolean => {
-    if (buildReportOnDevice()) return true;
-    if (!getApiBaseUrl()) {
-      Alert.alert("Export server required", exportServerRequiredMessage(), [
-        { text: "Cancel", style: "cancel" },
-        { text: "Open settings", onPress: () => router.push("/pilot-api-setup") },
-      ]);
-      return false;
-    }
-    return true;
-  };
-
   const handleGenerate = async () => {
-    if (!ensureExportServer()) return null;
+    setBusy(true);
     try {
       const data = await generateReport();
       setLastHtml(data.html);
@@ -125,83 +116,86 @@ export default function ReportExportScreen() {
     } catch (e) {
       Alert.alert("Report", e instanceof Error ? e.message : "Unknown error");
       return null;
+    } finally {
+      setBusy(false);
     }
-  };
-
-  const writeFile = async (ext: string, content: string, mime: string) => {
-    const name = `${filenameBase}${ext}`;
-    const uri = `${FileSystem.documentDirectory}${name}`;
-    await FileSystem.writeAsStringAsync(uri, content, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
-    if (Platform.OS === "web") {
-      const blob = new Blob([content], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(url);
-      Alert.alert("Download", `${name} downloaded`);
-      return;
-    }
-    await Share.share({ url: uri, title: name });
   };
 
   const handlePdf = async () => {
-    if (!ensureExportServer()) return;
-    const data = lastHtml
-      ? { html: lastHtml, docxText: lastDocx ?? "", filenameBase }
-      : await handleGenerate();
-    const html = data?.html;
-    if (!html) return;
-    if (Platform.OS === "web") {
-      const w = window.open("", "_blank");
-      if (w) {
-        w.document.write(html);
-        w.document.close();
-        w.print();
+    setBusy(true);
+    try {
+      const data = lastHtml
+        ? { html: lastHtml, docxText: lastDocx ?? "", filenameBase, docxBase64: "" }
+        : await handleGenerate();
+      const html = data?.html;
+      if (!html) return;
+
+      if (Platform.OS === "web") {
+        const w = window.open("", "_blank");
+        if (w) {
+          w.document.write(html);
+          w.document.close();
+          w.print();
+        }
+        return;
       }
-      return;
+
+      const { uri: tempUri } = await Print.printToFileAsync({ html });
+      const saved = await persistReportFile(tempUri, `${data!.filenameBase}.pdf`);
+      notifyReportSaved(saved, "PDF");
+    } catch (e) {
+      Alert.alert("PDF", e instanceof Error ? e.message : "Could not save PDF");
+    } finally {
+      setBusy(false);
     }
-    await writeFile(".html", html, "text/html");
-    Alert.alert(
-      "PDF on device",
-      "Open the shared HTML report in a browser and use Print → Save as PDF.",
-    );
   };
 
   const handleDocx = async () => {
-    const data = await handleGenerate();
-    if (!data) return;
-    const b64 = data.docxBase64;
-    if (!b64) {
-      await writeFile(".docx.txt", data.docxText, "text/plain");
-      Alert.alert("DOCX", "Saved as plain text fallback.");
-      return;
+    setBusy(true);
+    try {
+      const data = await (lastHtml && lastDocx
+        ? Promise.resolve({
+            html: lastHtml,
+            docxText: lastDocx,
+            filenameBase,
+            docxBase64: "",
+          })
+        : handleGenerate());
+      if (!data) return;
+
+      if (data.docxBase64) {
+        const saved = await saveBytesReport(
+          `${data.filenameBase}.docx`,
+          data.docxBase64,
+        );
+        notifyReportSaved(saved, "DOCX");
+        return;
+      }
+
+      const saved = await saveTextReport(
+        `${data.filenameBase}.docx.txt`,
+        data.docxText,
+      );
+      Alert.alert(
+        "DOCX saved as text",
+        `${saved.filename}\n\nOpen in Word or rename to .docx if needed.`,
+        [
+          { text: "OK" },
+          {
+            text: "Share",
+            onPress: () =>
+              void shareSavedReport(saved, "text/plain"),
+          },
+        ],
+      );
+    } catch (e) {
+      Alert.alert("DOCX", e instanceof Error ? e.message : "Could not save DOCX");
+    } finally {
+      setBusy(false);
     }
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const name = `${data.filenameBase}.docx`;
-    if (Platform.OS === "web") {
-      const blob = new Blob([bytes], {
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(url);
-      return;
-    }
-    const uri = `${FileSystem.documentDirectory}${name}`;
-    await FileSystem.writeAsStringAsync(uri, b64, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    await Share.share({ url: uri, title: name });
   };
+
+  const pending = busy || generateMutation.isPending;
 
   return (
     <ScreenContainer className="bg-background">
@@ -213,14 +207,10 @@ export default function ReportExportScreen() {
           Export report
         </Text>
         <Text style={{ color: colors.muted }}>
-          Includes TCP/NTCP, QUANTEC-oriented metrics, and literature references (Gyan layer).
-          {isOfflineBuild()
-            ? buildReportOnDevice()
-              ? " Mobile: report (including clinical section) is built on this device."
-              : " Mobile: calculations on-device; reports via export server or on-device if server not set."
-            : ""}
+          TCP/NTCP, QUANTEC-oriented metrics, and literature references. On mobile, PDF and
+          DOCX are generated and saved on this device.
         </Text>
-        {buildReportOnDevice() ? (
+        {onDevice ? (
           <View
             style={{
               backgroundColor: "#D1FAE5",
@@ -231,8 +221,7 @@ export default function ReportExportScreen() {
             }}
           >
             <Text style={{ color: "#065F46", fontSize: 13 }}>
-              PDF/DOCX built on this device. Optional: set an export server on Home for
-              shared templates or older builds.
+              {OFFLINE_EXPORT_HINT}
             </Text>
           </View>
         ) : null}
@@ -266,7 +255,7 @@ export default function ReportExportScreen() {
 
         <Pressable
           onPress={handleGenerate}
-          disabled={generateMutation.isPending}
+          disabled={pending}
           style={{
             backgroundColor: colors.surface,
             padding: 14,
@@ -275,7 +264,7 @@ export default function ReportExportScreen() {
             borderColor: colors.border,
           }}
         >
-          {generateMutation.isPending ? (
+          {pending ? (
             <ActivityIndicator color={colors.primary} />
           ) : (
             <Text style={{ color: colors.foreground, fontWeight: "600", textAlign: "center" }}>
@@ -286,6 +275,7 @@ export default function ReportExportScreen() {
 
         <Pressable
           onPress={handlePdf}
+          disabled={pending}
           style={{
             backgroundColor: colors.primary,
             padding: 16,
@@ -293,19 +283,23 @@ export default function ReportExportScreen() {
             flexDirection: "row",
             alignItems: "center",
             gap: 10,
+            opacity: pending ? 0.7 : 1,
           }}
         >
           <MaterialIcons name="picture-as-pdf" size={28} color="#fff" />
           <View>
-            <Text style={{ color: "#fff", fontWeight: "700" }}>PDF</Text>
+            <Text style={{ color: "#fff", fontWeight: "700" }}>Save PDF on device</Text>
             <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}>
-              Web: print dialog · Mobile: HTML share → Print to PDF
+              {Platform.OS === "web"
+                ? "Browser print → Save as PDF"
+                : "Creates PDF in app reports folder"}
             </Text>
           </View>
         </Pressable>
 
         <Pressable
           onPress={handleDocx}
+          disabled={pending}
           style={{
             backgroundColor: colors.surface,
             padding: 16,
@@ -315,13 +309,16 @@ export default function ReportExportScreen() {
             flexDirection: "row",
             alignItems: "center",
             gap: 10,
+            opacity: pending ? 0.7 : 1,
           }}
         >
           <MaterialIcons name="article" size={28} color={colors.primary} />
           <View>
-            <Text style={{ color: colors.foreground, fontWeight: "700" }}>DOCX / Word</Text>
+            <Text style={{ color: colors.foreground, fontWeight: "700" }}>
+              Save DOCX on device
+            </Text>
             <Text style={{ color: colors.muted, fontSize: 12 }}>
-              Structured text with citations — open in Microsoft Word
+              Word-compatible file — open in Microsoft Word
             </Text>
           </View>
         </Pressable>

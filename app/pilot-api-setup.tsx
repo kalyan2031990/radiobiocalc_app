@@ -79,7 +79,7 @@ export default function PilotApiSetupScreen() {
           >
             <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
               {offlineMobile
-                ? `${OFFLINE_EXPORT_HINT} Run npm run start:server on a PC. Remote testers: use https ngrok (ngrok http 3000) — no trailing slash. Same Wi‑Fi testers may use http://LAN_IP:3000. Calculations never use this URL.`
+                ? `${OFFLINE_EXPORT_HINT} Optional: set a server only if you use an older build or shared web templates.`
                 : "API must be running on this PC (npm run start:server). On the phone use your PC's Wi‑Fi IPv4 from ipconfig — often 192.168.0.x. Example: http://192.168.0.101:3000. Same Wi‑Fi only; allow Windows Firewall port 3000. Remote testers: https ngrok URL."}
             </Text>
             <Text className="text-xs" style={{ color: colors.foreground }}>
