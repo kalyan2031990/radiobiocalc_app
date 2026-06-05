@@ -11,7 +11,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ActivityIndicator, View, Text } from "react-native";
+import { ActivityIndicator, Pressable, View, Text } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { loadPilotApiOverride } from "@/lib/pilot-api-store";
@@ -42,6 +42,15 @@ async function loadPilotApiOverrideWithTimeout(ms = 3000): Promise<void> {
   ]);
 }
 
+function initTrpcClient(): ReturnType<typeof createTRPCClient> | null {
+  try {
+    return createTRPCClient();
+  } catch (e) {
+    console.warn("[ApiClientProvider] createTRPCClient failed", e);
+    return null;
+  }
+}
+
 export function ApiClientProvider({ children }: { children: ReactNode }) {
   const colors = useColors();
   const [ready, setReady] = useState(false);
@@ -55,37 +64,25 @@ export function ApiClientProvider({ children }: { children: ReactNode }) {
         },
       }),
   );
-  const [trpcClient, setTrpcClient] = useState<ReturnType<
-    typeof createTRPCClient
-  > | null>(null);
+  const [trpcClient, setTrpcClient] = useState(initTrpcClient);
 
   const rebuild = useCallback(async () => {
     setBootError(null);
+    setTrpcClient((current) => current ?? initTrpcClient());
     try {
+      await loadPilotApiOverrideWithTimeout();
       if (isOfflineBuild()) {
-        void loadPilotApiOverride();
         const engine = offlineEngineSelfTest();
         if (!engine.ok) {
           setBootError(engine.detail);
         }
-        const base = getApiBaseUrl();
-        setApiBaseUrl(base || "offline://device");
-        setTrpcClient(createTRPCClient());
-      } else {
-        await loadPilotApiOverrideWithTimeout();
-        setApiBaseUrl(getApiBaseUrl());
-        setTrpcClient(createTRPCClient());
       }
-
+      const base = getApiBaseUrl();
+      setApiBaseUrl(base || (isOfflineBuild() ? "offline://device" : ""));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "API client setup failed";
       console.warn("[ApiClientProvider]", msg, e);
       setBootError(msg);
-      try {
-        setTrpcClient(createTRPCClient());
-      } catch {
-        /* keep null — still unblock UI below */
-      }
     } finally {
       setReady(true);
     }
@@ -103,7 +100,7 @@ export function ApiClientProvider({ children }: { children: ReactNode }) {
     [rebuild, apiBaseUrl],
   );
 
-  if (!ready || !trpcClient) {
+  if (!ready) {
     return (
       <View
         style={{
@@ -118,18 +115,35 @@ export function ApiClientProvider({ children }: { children: ReactNode }) {
         <Text style={{ marginTop: 12, color: colors.muted, textAlign: "center" }}>
           {isOfflineBuild() ? "Starting offline engine…" : "Loading API settings…"}
         </Text>
-        {bootError ? (
-          <Text
-            style={{
-              marginTop: 8,
-              color: colors.error,
-              fontSize: 12,
-              textAlign: "center",
-            }}
-          >
-            {bootError}
-          </Text>
-        ) : null}
+      </View>
+    );
+  }
+
+  if (!trpcClient) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: colors.background,
+          padding: 24,
+        }}
+      >
+        <Text style={{ color: colors.error, textAlign: "center", marginBottom: 12 }}>
+          {bootError ?? "Could not start the app API client."}
+        </Text>
+        <Pressable
+          onPress={() => void rebuild()}
+          style={{
+            backgroundColor: colors.primary,
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: colors.background, fontWeight: "600" }}>Retry</Text>
+        </Pressable>
       </View>
     );
   }

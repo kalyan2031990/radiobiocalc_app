@@ -46,6 +46,14 @@ APK output:
 
 Rename to `rbGyanX-Mobile-v2.1.1.apk` and sideload.
 
+## Smoke test on BlueStacks
+
+With BlueStacks running and **Settings → Advanced → Android Debug Bridge** enabled:
+
+```powershell
+npm run test:bluestacks
+```
+
 ## Offline mobile flag
 
 `EXPO_PUBLIC_OFFLINE_BUILD=1` is set automatically by `build:android:local`.

@@ -47,10 +47,16 @@ export function getApiBaseUrl(): string {
 }
 
 export function getTrpcHttpUrl(): string {
-  const base = getApiBaseUrl();
-  if (base) return `${base.replace(/\/$/, "")}/api/trpc`;
-  if (isOfflineBuild()) return `${OFFLINE_TRPC_STUB}/api/trpc`;
-  return `${resolveApiBaseUrl(API_BASE_URL).replace(/\/$/, "")}/api/trpc`;
+  try {
+    const base = getApiBaseUrl();
+    if (base) return `${base.replace(/\/$/, "")}/api/trpc`;
+    if (isOfflineBuild()) return `${OFFLINE_TRPC_STUB}/api/trpc`;
+    const resolved = resolveApiBaseUrl(API_BASE_URL).replace(/\/$/, "");
+    if (resolved) return `${resolved}/api/trpc`;
+  } catch {
+    /* use stub below */
+  }
+  return `${OFFLINE_TRPC_STUB}/api/trpc`;
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";
