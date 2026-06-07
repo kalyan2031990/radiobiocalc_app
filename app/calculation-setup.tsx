@@ -42,6 +42,7 @@ import {
 } from "@/lib/structure-role";
 import { analyzePlanScope } from "@/lib/plan-scope";
 import { inferCancerSiteFromStructureNames } from "@/lib/infer-cancer-site";
+import { isOfflineBuild } from "@/lib/offline-mode";
 
 interface Organ {
   name: string;
@@ -160,20 +161,29 @@ export default function CalculationSetupScreen() {
   const [showSitePicker, setShowSitePicker] = useState(false);
   const [showTechniquePicker, setShowTechniquePicker] = useState(false);
 
-  const sitesQuery = trpc.radiobiology.getSites.useQuery();
-  const techniquesQuery = trpc.radiobiology.getTechniques.useQuery();
-  const modelsQuery = trpc.radiobiology.getModels.useQuery({
-    structureType,
-  });
-  const siteOrgansQuery = trpc.radiobiology.getSiteOrgans.useQuery({
-    siteId: cancerSite,
-    role: structureType,
-  });
+  const offlineMode = isOfflineBuild();
 
-  const organsQuery = trpc.radiobiology.getOrgans.useQuery();
+  const sitesQuery = trpc.radiobiology.getSites.useQuery(undefined, {
+    enabled: !offlineMode,
+  });
+  const techniquesQuery = trpc.radiobiology.getTechniques.useQuery(undefined, {
+    enabled: !offlineMode,
+  });
+  const modelsQuery = trpc.radiobiology.getModels.useQuery(
+    { structureType },
+    { enabled: !offlineMode },
+  );
+  const siteOrgansQuery = trpc.radiobiology.getSiteOrgans.useQuery(
+    { siteId: cancerSite, role: structureType },
+    { enabled: !offlineMode && cancerSite !== "UNKNOWN" },
+  );
+
+  const organsQuery = trpc.radiobiology.getOrgans.useQuery(undefined, {
+    enabled: !offlineMode,
+  });
   const paramsQuery = trpc.radiobiology.getParameters.useQuery(
     { organ: selectedOrgan, model: selectedModel },
-    { enabled: !!selectedOrgan },
+    { enabled: !offlineMode && !!selectedOrgan },
   );
 
   const fallbackOrgans: Organ[] = [

@@ -5,7 +5,7 @@
 import Constants from "expo-constants";
 
 /** Keep in sync with app.config.ts `version`. */
-export const APP_VERSION = "2.1.0";
+export const APP_VERSION = "2.2.1";
 
 export const APP_DISPLAY_NAME = "rbGyanX";
 export const APP_TAGLINE = "One Patient · One Plan · Complete Evaluation";
@@ -16,9 +16,11 @@ export function getAppVersion(): string {
 }
 
 export function getBuildLabel(): string {
+  const extra = Constants.expoConfig?.extra as { buildNumber?: number } | undefined;
   const build =
-    Constants.expoConfig?.android?.versionCode ??
-    Constants.nativeBuildVersion;
+    Constants.nativeBuildVersion ??
+    extra?.buildNumber ??
+    Constants.expoConfig?.android?.versionCode;
   if (build != null && build !== "") {
     return `build ${build}`;
   }

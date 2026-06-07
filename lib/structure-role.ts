@@ -2,7 +2,7 @@
  * TCP (target) vs NTCP (OAR) evaluation role — literature-driven.
  */
 
-import { mapToLiteratureOrgan } from "@/lib/plan-evaluation";
+import { mapToLiteratureOrgan } from "@/lib/literature-organ-map";
 
 export const TARGET_LITERATURE_ORGANS = new Set(["PTV", "GTV", "CTV", "ITV"]);
 

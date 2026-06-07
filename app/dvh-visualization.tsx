@@ -13,6 +13,7 @@ import { trpc } from "@/lib/trpc";
 import { loadDvhSession } from "@/lib/dvh-session";
 import { structureKeys, type ParsedDvhBundle } from "@/lib/plan-evaluation";
 import { inferEvaluationRole } from "@/lib/structure-role";
+import { arrayMax, arrayMin } from "@/lib/numeric-safe";
 
 type StructureRow = {
   name: string;
@@ -26,8 +27,8 @@ type StructureRow = {
 function statsFromDvh(points: DVHPoint[]) {
   if (!points.length) return { maxDose: 0, meanDose: 0, minDose: 0 };
   const doses = points.map((p) => p.dose);
-  const maxDose = Math.max(...doses);
-  const minDose = Math.min(...doses);
+  const maxDose = arrayMax(doses, 0);
+  const minDose = arrayMin(doses, 0);
   let sum = 0;
   let w = 0;
   for (let i = 1; i < points.length; i++) {

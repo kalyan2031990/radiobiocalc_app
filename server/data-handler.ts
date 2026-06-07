@@ -10,7 +10,7 @@
  */
 
 import { inferStructureRole } from "./structure-role";
-import { DVHPoint } from "./radiobiology";
+import type { DVHPoint } from "./radiobiology";
 import { z } from "zod";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,13 +159,13 @@ export function parseEclipseTxt(
   }
 
   if (isDifferential) {
-    const rev = [...dvhPoints].reverse();
-    let cum = 0;
-    for (const p of rev) {
-      cum += p.volume;
-      p.volume = cum;
+    dvhPoints.reverse();
+    let cumulativeVolume = 0;
+    for (const point of dvhPoints) {
+      cumulativeVolume += point.volume;
+      point.volume = cumulativeVolume;
     }
-    dvhPoints.splice(0, dvhPoints.length, ...rev.reverse());
+    dvhPoints.reverse();
   }
 
   dvhPoints.sort((a, b) => a.dose - b.dose);

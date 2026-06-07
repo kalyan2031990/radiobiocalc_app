@@ -29,8 +29,9 @@ const config: ExpoConfig = {
       ? "rbGyanX Pilot"
       : env.appName,
   slug: env.appSlug,
-  version: "2.1.1",
+  version: "2.2.1",
   extra: {
+    buildNumber: 15,
     offlineBuild: isOfflineBuild,
     pilotBuild: isPilotBuild,
     eas: {
@@ -42,7 +43,7 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
+  newArchEnabled: false,
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
@@ -51,7 +52,7 @@ const config: ExpoConfig = {
     },
   },
   android: {
-    versionCode: 7,
+    versionCode: 15,
     /** Pilot LAN API uses http:// — required for phone → PC on Wi‑Fi */
     usesCleartextTraffic: true,
     adaptiveIcon: {
@@ -121,7 +122,7 @@ const config: ExpoConfig = {
   ],
   experiments: {
     typedRoutes: true,
-    reactCompiler: true,
+    reactCompiler: false,
   },
 };
 

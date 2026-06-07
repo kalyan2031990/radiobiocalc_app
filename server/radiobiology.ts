@@ -17,6 +17,7 @@
  */
 
 import { z } from "zod";
+import { arrayMax, arrayMin } from "@/lib/numeric-safe";
 import { getTcpSiteParams } from "./tcp-site-params";
 import { getTechnique } from "./techniques";
 import { computeExtendedPhysicalMetrics } from "./tcp-dvh-engine";
@@ -186,7 +187,7 @@ export function calculateGEUD(
 
   if (!isFinite(aParameter)) {
     // a = ∞: maximum dose
-    return Math.max(...dvh.map((p) => p.dose));
+    return arrayMax(dvh.map((p) => p.dose));
   }
 
   // General case
@@ -255,8 +256,8 @@ export function calculateDoseMetrics(dvh: DVHPoint[]): DoseMetrics {
   const relativeVolumes = volumes.map((v) => v / totalVolume);
 
   // Basic metrics
-  const maxDose = Math.max(...doses);
-  const minDose = Math.min(...doses.filter((d) => d > 0));
+  const maxDose = arrayMax(doses);
+  const minDose = arrayMin(doses.filter((d) => d > 0), maxDose);
   const meanDose = relativeVolumes.reduce((sum, vi, i) => sum + vi * doses[i], 0);
 
   // Vxx on differential DVH: sum bin fractions with dose >= threshold

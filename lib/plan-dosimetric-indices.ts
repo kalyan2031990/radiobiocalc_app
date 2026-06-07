@@ -11,6 +11,7 @@
 
 
 import type { DVHPoint } from "@/lib/plan-evaluation";
+import { arrayMax } from "@/lib/numeric-safe";
 
 import {
 
@@ -92,7 +93,7 @@ function totalVolume(dvh: DVHPoint[]): number {
 
   const s = sortedCumulative(dvh);
 
-  return Math.max(...s.map((p) => p.volume), 1e-9);
+  return arrayMax(s.map((p) => p.volume), 1e-9);
 
 }
 

@@ -59,7 +59,8 @@ export function ClinicalDisclaimerModal() {
             padding: 24,
             maxWidth: 600,
             width: "100%",
-            maxHeight: "80%",
+            maxHeight: "85%",
+            flexDirection: "column",
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.3,
@@ -67,7 +68,11 @@ export function ClinicalDisclaimerModal() {
             elevation: 8,
           }}
         >
-          <ScrollView showsVerticalScrollIndicator={true}>
+          <ScrollView
+            showsVerticalScrollIndicator={true}
+            style={{ flexGrow: 0, flexShrink: 1 }}
+            contentContainerStyle={{ paddingBottom: 8 }}
+          >
             {/* Title */}
             <Text
               style={{
@@ -277,55 +282,57 @@ export function ClinicalDisclaimerModal() {
                 This app operates <Text style={{ fontWeight: "bold" }}>offline-first</Text> with <Text style={{ fontWeight: "bold" }}>local-only data storage</Text>. No patient data is automatically transmitted to external servers. No tracking or analytics are performed. User privacy and data security are paramount.
               </Text>
             </View>
-
-            {/* Acceptance Checkbox */}
-            <View
-              style={{
-                backgroundColor: colors.surface,
-                padding: 16,
-                borderRadius: 8,
-                marginBottom: 20,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: colors.foreground,
-                  lineHeight: 20,
-                  textAlign: "center",
-                }}
-              >
-                By clicking "I Understand and Accept", you acknowledge that you have read and understood this disclaimer and agree to use this app in accordance with these terms.
-              </Text>
-            </View>
-
-            {/* Accept Button */}
-            <TouchableOpacity
-              onPress={handleAccept}
-              style={{
-                backgroundColor: colors.primary,
-                paddingVertical: 16,
-                paddingHorizontal: 32,
-                borderRadius: 12,
-                alignItems: "center",
-                shadowColor: colors.primary,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.3,
-                shadowRadius: 4,
-                elevation: 4,
-              }}
-            >
-              <Text
-                style={{
-                  color: "#FFFFFF",
-                  fontSize: 16,
-                  fontWeight: "bold",
-                }}
-              >
-                I Understand and Accept
-              </Text>
-            </TouchableOpacity>
           </ScrollView>
+
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              padding: 12,
+              borderRadius: 8,
+              marginTop: 12,
+              marginBottom: 12,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                color: colors.foreground,
+                lineHeight: 18,
+                textAlign: "center",
+              }}
+            >
+              By tapping below, you acknowledge this disclaimer and agree to use the app accordingly.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            testID="disclaimer-accept"
+            onPress={handleAccept}
+            accessibilityRole="button"
+            accessibilityLabel="I Understand and Accept"
+            style={{
+              backgroundColor: colors.primary,
+              paddingVertical: 16,
+              paddingHorizontal: 32,
+              borderRadius: 12,
+              alignItems: "center",
+              shadowColor: colors.primary,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 4,
+            }}
+          >
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 16,
+                fontWeight: "bold",
+              }}
+            >
+              I Understand and Accept
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>

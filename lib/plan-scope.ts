@@ -2,7 +2,7 @@
  * When therapeutic window / TCP–NTCP trade-off applies.
  */
 
-import type { ParsedDvhBundle } from "@/lib/plan-evaluation";
+import type { ParsedDvhBundle } from "@/lib/dvh-bundle-types";
 import { structureKeys } from "@/lib/plan-evaluation";
 import { inferEvaluationRole } from "@/lib/structure-role";
 

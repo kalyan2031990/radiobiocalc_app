@@ -5,7 +5,7 @@
 
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { ParsedDvhBundle } from "@/lib/plan-evaluation";
+import type { ParsedDvhBundle } from "@/lib/dvh-bundle-types";
 
 const PREFIX = "rbgyanx_dvh:";
 

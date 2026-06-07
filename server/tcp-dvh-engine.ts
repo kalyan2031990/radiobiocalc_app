@@ -3,6 +3,7 @@
  * Poisson-LQ N_eff: engine/radiobiology/poisson_tcp.py
  */
 
+import { arrayMax, arrayMin } from "@/lib/numeric-safe";
 import type { DVHPoint } from "./radiobiology";
 import type { TCPSiteParams } from "./tcp-site-params";
 import { n0ForTarget } from "./tcp-site-params";
@@ -23,7 +24,7 @@ export interface ExtendedDoseMetrics {
 }
 
 function toVolumeFractions(dvh: DVHPoint[]): { dose: number; volFrac: number }[] {
-  const tv = Math.max(...dvh.map((p) => p.volume), 1e-9);
+  const tv = Math.max(arrayMax(dvh.map((p) => p.volume), 0), 1e-9);
   return dvh.map((p) => ({ dose: p.dose, volFrac: p.volume / tv }));
 }
 
@@ -47,13 +48,14 @@ export function computeExtendedPhysicalMetrics(
   }
 
   const sorted = [...dvh].sort((a, b) => a.dose - b.dose);
-  const tv = Math.max(...sorted.map((p) => p.volume));
+  const tv = arrayMax(sorted.map((p) => p.volume), 1e-9);
   const doses = sorted.map((p) => p.dose);
   const relV = sorted.map((p) => p.volume / tv);
 
   const meanDose = relV.reduce((s, v, i) => s + v * doses[i], 0);
-  const maxDose = Math.max(...doses);
-  const minDose = Math.min(...doses.filter((d) => d > 0), maxDose);
+  const maxDose = arrayMax(doses, 0);
+  const positiveDoses = doses.filter((d) => d > 0);
+  const minDose = positiveDoses.length > 0 ? arrayMin(positiveDoses, maxDose) : maxDose;
 
   const dPercentile = (pct: number) => {
     const target = pct / 100;

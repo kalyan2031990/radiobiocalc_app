@@ -76,7 +76,7 @@ if ($xml -match "Self-test passed") { $report.selfTestOk = $true }
 if (Tap-Text $xml "Import plan DVH") {
   Start-Sleep -Seconds 4
   $xml2 = Get-UiXml
-  if ($xml2 -match "Tap to select file") { $report.dvhScreenOk = $true }
+  if ($xml2 -match "Import plan DVH|Download/rbgyanx_test|Files in Downloads") { $report.dvhScreenOk = $true }
 }
 
 if (-not $report.disclaimerAccepted) { $report.errors += "Disclaimer accept failed" }

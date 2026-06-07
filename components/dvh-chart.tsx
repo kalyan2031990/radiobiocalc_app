@@ -14,6 +14,7 @@ import Svg, {
   Rect,
 } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
+import { arrayMax } from "@/lib/numeric-safe";
 
 export interface DVHPoint {
   dose: number; // Gy
@@ -57,7 +58,7 @@ export function DVHChart({
   }
 
   // Find max dose from data
-  const dataMaxDose = Math.max(...dvhData.map((p) => p.dose));
+  const dataMaxDose = arrayMax(dvhData.map((p) => p.dose), 80);
   const doseRange = Math.max(dataMaxDose, maxDose || 80);
 
   // Generate SVG path for DVH curve
