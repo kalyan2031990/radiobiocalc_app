@@ -26,18 +26,24 @@ Build **rbGyanX Mobile** on your Windows PC — free, no Expo build queue.
 
 ```powershell
 cd path\to\radiobiocalc_app
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:Path += ";$env:JAVA_HOME\bin;$env:LOCALAPPDATA\Android\Sdk\platform-tools"
 npm run clean:expo-cache
 npm run build:android:local
 ```
 
 For a full wipe of the native `android/` folder, use `npm run build:android:local:clean` instead. **Close Android Studio** and any Explorer window inside `android/` first, or Windows may report `EBUSY` when deleting that folder.
 
-If prebuild already ran once, you can rebuild only the APK:
+If prebuild already ran once, rebuild only the APK (offline mobile bundle):
 
 ```powershell
-cd android
-.\gradlew.bat --stop
-.\gradlew.bat assembleRelease
+npm run build:android:release
+```
+
+Install on a USB phone:
+
+```powershell
+npm run install:phone
 ```
 
 APK output:
@@ -46,13 +52,14 @@ APK output:
 
 Rename to `rbGyanX-Mobile-v2.1.1.apk` and sideload.
 
-## Smoke test on BlueStacks
-
-With BlueStacks running and **Settings → Advanced → Android Debug Bridge** enabled:
+## Verify (automated + device)
 
 ```powershell
-npm run test:bluestacks
+npm run test:automation
+npm run install:phone
 ```
+
+Desktop browser: `npm run dev:desktop` → http://localhost:8081
 
 ## Offline mobile flag
 

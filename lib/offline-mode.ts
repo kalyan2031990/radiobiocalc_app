@@ -13,6 +13,16 @@ function isPilotBuild(): boolean {
   return process.env.EXPO_PUBLIC_PILOT_BUILD === "1";
 }
 
+/** Browser on Windows — same on-device DVH/calc path as mobile offline (no API). */
+export function isDesktopClient(): boolean {
+  return Platform.OS === "web";
+}
+
+/** Use local parser + offline engine (mobile APK or desktop browser). */
+export function usesLocalEngine(): boolean {
+  return isDesktopClient() || isOfflineBuild();
+}
+
 export function isOfflineBuild(): boolean {
   if (isPilotBuild()) return false;
 

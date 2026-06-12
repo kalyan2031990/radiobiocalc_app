@@ -81,6 +81,12 @@ export interface CalculationRequest {
   parameters?: Partial<OrganParameters>;
   /** gEUD volume parameter a (default 1 = mean-dose-like) */
   geudExponent?: number;
+  /** Apply per-bin EQD2 to DVH before gEUD/NTCP (default true when d/fx ≠ 2 Gy) */
+  useEqd2Dvh?: boolean;
+  /** Poisson TCP clonogenic cell count (default site literature value) */
+  numClonogenicCells?: number;
+  /** LKB probit: use Kutcher–Burman effective-volume reduction (default true) */
+  useKbProbitReduction?: boolean;
   cancerSite?: string;
   technique?: string;
   targetType?: string;
@@ -148,6 +154,50 @@ export function calculateEQD2(
   const eqd2 = totalDose * ((alphaBeta + dosePerFraction) / (alphaBeta + 2));
   return eqd2;
 }
+
+/**
+ * Per-bin EQD2 for DVH reduction (2 Gy reference).
+ * D_bin = physical dose at bin; d_fp = prescription dose per fraction.
+ */
+export function calculateBinEQD2(
+  doseBinGy: number,
+  dosePerFractionGy: number,
+  alphaBeta: number,
+): number {
+  if (doseBinGy <= 0 || alphaBeta <= 0) return 0;
+  return doseBinGy * ((alphaBeta + dosePerFractionGy) / (alphaBeta + 2));
+}
+
+/** Kutcher–Burman effective volume for LKB probit. */
+export function calculateEffectiveVolume(
+  dvhDiff: DVHPoint[],
+  n: number,
+): number {
+  if (!dvhDiff.length || n <= 0) return 1;
+  const maxD = Math.max(...dvhDiff.map((p) => p.dose));
+  if (maxD <= 0) return 1;
+  const totalV = dvhDiff.reduce((s, p) => s + p.volume, 0);
+  if (totalV <= 0) return 1;
+  let sum = 0;
+  for (const p of dvhDiff) {
+    sum += p.volume * Math.pow(p.dose / maxD, 1 / n);
+  }
+  return sum / totalV;
+}
+
+export function convertDvhToEqd2Scale(
+  dvhDiff: DVHPoint[],
+  dosePerFractionGy: number,
+  alphaBeta: number,
+): DVHPoint[] {
+  return dvhDiff.map((p) => ({
+    dose: calculateBinEQD2(p.dose, dosePerFractionGy, alphaBeta),
+    volume: p.volume,
+  }));
+}
+
+/** Default clonogen count for TCP Poisson (cite: Niemierko 1997, site-dependent). */
+export const DEFAULT_CLONOGENIC_CELLS = 1e9;
 
 /**
  * Calculate generalized Equivalent Uniform Dose (gEUD)
@@ -443,7 +493,7 @@ export function calculateTCP_Poisson(
   meanDose: number,
   d50: number,
   gamma: number,
-  numClonogenicCells: number = 1e7
+  numClonogenicCells: number = DEFAULT_CLONOGENIC_CELLS
 ): number {
   if (meanDose <= 0 || d50 <= 0 || gamma <= 0) {
     return 0;
@@ -567,7 +617,15 @@ export function performCalculation(
     };
   }
 
-  // Calculate dose metrics
+  const dpf = request.totalDose / request.numFractions;
+  const useEqd2Dvh =
+    request.useEqd2Dvh ??
+    (request.structureType === "oar" && Math.abs(dpf - 2) > 0.05);
+  const dvhForReduction = useEqd2Dvh
+    ? convertDvhToEqd2Scale(dvhDiff, dpf, params.alphaBeta)
+    : dvhDiff;
+
+  // Calculate dose metrics (physical DVH for reporting)
   const doseMetrics = calculateDoseMetrics(dvhDiff);
   if (!Number.isFinite(doseMetrics.gEUD) || doseMetrics.totalVolume <= 0) {
     return {
@@ -583,8 +641,11 @@ export function performCalculation(
     };
   }
   const aExp = request.geudExponent ?? 1;
+  const gEUDInput = useEqd2Dvh ? dvhForReduction : dvhDiff;
   if (aExp !== 1) {
-    doseMetrics.gEUD = calculateGEUD(dvhDiff, aExp);
+    doseMetrics.gEUD = calculateGEUD(gEUDInput, aExp);
+  } else if (useEqd2Dvh && request.structureType === "oar") {
+    doseMetrics.gEUD = calculateGEUD(gEUDInput, 1);
   }
 
   const technique = getTechnique(request.technique ?? "IMRT");
@@ -592,7 +653,6 @@ export function performCalculation(
     request.lqMaxDosePerFractionGy ??
     technique?.lqValidMaxDosePerFractionGy ??
     10;
-  const dpf = request.totalDose / request.numFractions;
   const lqCaution = dpf > lqMax;
 
   const siteParams = request.cancerSite
@@ -636,7 +696,12 @@ export function performCalculation(
         lqMax
       );
     } else if (request.model === "poisson") {
-      tcp = calculateTCP_Poisson(doseMetrics.meanDose, params.d50, params.gamma);
+      tcp = calculateTCP_Poisson(
+        doseMetrics.meanDose,
+        params.d50,
+        params.gamma,
+        request.numClonogenicCells ?? DEFAULT_CLONOGENIC_CELLS,
+      );
     } else if (request.model === "lkb_loglogit") {
       tcp = calculateTCP_LKB(doseMetrics.gEUD, params.td50, params.gamma50);
     }
@@ -648,15 +713,28 @@ export function performCalculation(
         : request.model;
 
     if (modelUsed === "lkb_loglogit") {
-      ntcp = calculateNTCP_LKB_LogLogit(doseMetrics.gEUD, params.td50, params.gamma50);
+      const geudNtcp = useEqd2Dvh ? calculateGEUD(gEUDInput, 1) : doseMetrics.gEUD;
+      ntcp = calculateNTCP_LKB_LogLogit(geudNtcp, params.td50, params.gamma50);
     } else if (modelUsed === "lkb_probit") {
-      ntcp = calculateNTCP_LKB_Probit(
-        doseMetrics.maxDose,
-        1.0,
-        params.td50,
-        params.m,
-        params.n
-      );
+      const useKb = request.useKbProbitReduction !== false;
+      if (useKb) {
+        const vEff = calculateEffectiveVolume(dvhForReduction, params.n);
+        ntcp = calculateNTCP_LKB_Probit(
+          doseMetrics.maxDose,
+          vEff,
+          params.td50,
+          params.m,
+          params.n,
+        );
+      } else {
+        ntcp = calculateNTCP_LKB_Probit(
+          doseMetrics.maxDose,
+          1.0,
+          params.td50,
+          params.m,
+          params.n,
+        );
+      }
     } else if (modelUsed === "poisson") {
       ntcp = calculateNTCP_Poisson(
         doseMetrics.meanDose,

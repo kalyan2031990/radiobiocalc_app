@@ -6,12 +6,14 @@
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { ParsedDvhBundle } from "@/lib/dvh-bundle-types";
+import { anonymizeDvhBundle } from "@/lib/anonymize";
 
 const PREFIX = "rbgyanx_dvh:";
 
 export async function saveDvhSession(bundle: ParsedDvhBundle): Promise<string> {
+  const safe = anonymizeDvhBundle(bundle);
   const id = `dvh_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const json = JSON.stringify(bundle);
+  const json = JSON.stringify(safe);
   const key = PREFIX + id;
 
   if (Platform.OS === "web" && typeof sessionStorage !== "undefined") {

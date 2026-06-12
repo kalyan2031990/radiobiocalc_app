@@ -21,13 +21,11 @@ This guide explains how to build and install the **rbGyanX-genius evolved** Andr
 - USB cable (for transferring APK) or internet connection (for download)
 - "Install from Unknown Sources" enabled in device settings
 
-### For Installing on Desktop
+### For Desktop (browser — recommended on Windows)
 
-- **Android Emulator** (one of the following):
-  - **Android Studio** (recommended) - https://developer.android.com/studio
-  - **BlueStacks** - https://www.bluestacks.com
-  - **NoxPlayer** - https://www.bignox.com
-  - **LDPlayer** - https://www.ldplayer.net
+- **rbGyanX web app:** `npm run dev:desktop` → http://localhost:8081 (full DVH file picker, no emulator)
+- **Physical Android phone (USB):** `npm run build:android:release` then `npm run install:phone`
+- Android emulators are **not supported** for this React Native build (use browser or a real device)
 
 ---
 
@@ -165,24 +163,13 @@ This guide explains how to build and install the **rbGyanX-genius evolved** Andr
    - Find "rbGyanX-genius evolved" in the app drawer
    - Click to launch
 
-### Using BlueStacks
+### Using desktop browser (Windows)
 
-1. **Download and install BlueStacks**:
-   - Visit https://www.bluestacks.com
-   - Download the installer for your OS
-   - Run the installer and follow the setup wizard
+1. From the repo: `npm run dev:desktop`
+2. Open http://localhost:8081 in Chrome or Edge
+3. Import Eclipse `.txt` DVH files, run setup, view **rb X** explainability tab
 
-2. **Install the APK**:
-   - Open BlueStacks
-   - Click "Install APK" button in the sidebar
-   - Select the APK file
-   - Wait for installation to complete
-
-3. **Launch the app**:
-   - Find "rbGyanX-genius evolved" in the home screen
-   - Click to launch
-
-### Using NoxPlayer
+### Using NoxPlayer (not recommended)
 
 1. **Download and install NoxPlayer**:
    - Visit https://www.bignox.com
@@ -241,7 +228,7 @@ This guide explains how to build and install the **rbGyanX-genius evolved** Andr
 2. Allocate more RAM to the emulator (4 GB minimum)
 3. Use a different system image (try Android 10 or 11)
 4. Update graphics drivers
-5. Try a different emulator (BlueStacks, NoxPlayer)
+5. Use desktop browser (`npm run dev:desktop`) or a physical Android phone instead of emulators
 
 ### App Crashes on Launch
 

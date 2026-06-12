@@ -3,6 +3,7 @@
  */
 import { parseCSVDVH } from "../server/data-handler";
 import { evaluateCompositePlan } from "../server/composite-plan-evaluation";
+import { buildSingleStructureExplanation } from "../lib/rbgyanx-explain";
 
 const synthetic = `dose,volume,structure
 0,100,PTV70
@@ -47,6 +48,25 @@ if (sbrt.targetIndices?.ciPaddick == null) {
   process.exit(1);
 }
 
+const single = buildSingleStructureExplanation({
+  structureType: "oar",
+  organ: "Parotid",
+  model: "lkb_loglogit",
+  structureName: "Parotid_L",
+  ntcp: 0.12,
+  doseMetrics: { meanDose: 24, maxDose: 48, gEUD: 22, d2: 40 },
+  totalDose: 70,
+  numFractions: 35,
+  technique: "IMRT",
+  bed: 72,
+  eqd2: 68,
+});
+if (!single.bullets.length || !single.rbXScope.includes("XAI")) {
+  console.error("FAIL: single-structure XAI missing");
+  process.exit(1);
+}
+
 console.log("PASS Phase 4 XAI — conventional gated, SBRT indices, explanation bullets");
 console.log(`  ${ev.planExplanation.headline}`);
 console.log(`  bullets: ${ev.planExplanation.bullets.length}`);
+console.log(`  single-structure XAI bullets: ${single.bullets.length}`);

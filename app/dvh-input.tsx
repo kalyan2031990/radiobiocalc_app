@@ -1,10 +1,14 @@
 /**
- * DVH Input — offline screen only loaded on device builds (no tRPC bundle).
+ * DVH Input — desktop browser, offline mobile, or online pilot.
  */
 
-import { isOfflineBuild } from "@/lib/offline-mode";
+import { isDesktopClient, isOfflineBuild } from "@/lib/offline-mode";
 
 export default function DVHInputScreen() {
+  if (isDesktopClient()) {
+    const Screen = require("./dvh-input-desktop").default;
+    return <Screen />;
+  }
   if (isOfflineBuild()) {
     const Screen = require("./dvh-input-offline").default;
     return <Screen />;

@@ -37,8 +37,9 @@ import type { ParsedDvhBundle } from "@/lib/plan-evaluation";
 import { doseMetricsRowsForEvaluation } from "@/lib/dose-metrics-guidelines";
 import { savePlanEvalSession } from "@/lib/plan-eval-session";
 import { ParameterProvenancePanel } from "@/components/parameter-provenance-panel";
-import { isOfflineBuild } from "@/lib/offline-mode";
-import { offlineCalculate, offlineEvaluateComposite } from "@/lib/offline-engine";
+import { RbXExplanationPanel } from "@/components/rbx-explanation-panel";
+import { usesLocalEngine } from "@/lib/offline-mode";
+import { buildSingleStructureExplanation } from "@/lib/rbgyanx-explain";
 
 interface DoseMetrics {
   meanDose: number;
@@ -143,6 +144,29 @@ export default function CalculationResultsScreen() {
     performCalculation();
   }, [dvhSessionId, serverDvhSessionId, serverDvhQuery.data, serverDvhQuery.isLoading]);
 
+  const guidelineMetrics = useMemo(() => {
+    if (!result?.doseMetrics) return [];
+    return doseMetricsRowsForEvaluation(structureType, organ, result.doseMetrics);
+  }, [result, structureType, organ]);
+
+  const rbxExplanation = useMemo(() => {
+    if (!result) return null;
+    return buildSingleStructureExplanation({
+      structureType,
+      organ,
+      model: result.model,
+      structureName,
+      tcp: result.tcp,
+      ntcp: result.ntcp,
+      doseMetrics: result.doseMetrics,
+      totalDose,
+      numFractions,
+      technique,
+      bed: result.bed,
+      eqd2: result.eqd2,
+    });
+  }, [result, structureType, organ, structureName, totalDose, numFractions, technique]);
+
   const performCalculation = async () => {
     try {
       setLoading(true);
@@ -174,7 +198,8 @@ export default function CalculationResultsScreen() {
       setPlanStats(computePlanDescriptiveStats(points));
 
       let data;
-      if (isOfflineBuild()) {
+      if (usesLocalEngine()) {
+        const { offlineCalculate } = await import("@/lib/offline-engine");
         data = offlineCalculate({
           dvh: points,
           totalDose,
@@ -271,11 +296,6 @@ export default function CalculationResultsScreen() {
   }
 
   const isTarget = structureType === "target";
-
-  const guidelineMetrics = useMemo(() => {
-    if (!result?.doseMetrics) return [];
-    return doseMetricsRowsForEvaluation(structureType, organ, result.doseMetrics);
-  }, [result, structureType, organ]);
 
   return (
     <ScreenContainer className="bg-background">
@@ -464,7 +484,7 @@ export default function CalculationResultsScreen() {
                   ["bio", "Biological"],
                   ["stats", "Statistics"],
                   ["params", "Parameters"],
-                  ["gyan", "Gyan"],
+                  ["gyan", "rb X"],
                   ["clinical", "Clinical"],
                 ] as const
               ).map(([tab, label]) => (
@@ -684,7 +704,10 @@ export default function CalculationResultsScreen() {
           )}
 
           {activeTab === "gyan" && (
-            <View className="rounded-lg p-4 gap-2" style={{ backgroundColor: colors.surface }}>
+            <View className="rounded-lg p-4 gap-4" style={{ backgroundColor: colors.surface }}>
+              {rbxExplanation ? (
+                <RbXExplanationPanel explanation={rbxExplanation} />
+              ) : null}
               <ParameterProvenancePanel organ={organ} model={model} />
             </View>
           )}
@@ -863,7 +886,7 @@ export default function CalculationResultsScreen() {
                   );
                   return;
                 }
-                if (!isOfflineBuild() && !serverDvhSessionId) {
+                if (!usesLocalEngine() && !serverDvhSessionId) {
                   Alert.alert(
                     "Therapeutic window",
                     "Re-import the plan DVH so the server session is available, then run calculation again.",
@@ -873,7 +896,7 @@ export default function CalculationResultsScreen() {
                 setTwLoading(true);
                 try {
                   let evaluation;
-                  if (isOfflineBuild()) {
+                  if (usesLocalEngine()) {
                     const bundle = dvhSessionId
                       ? await loadDvhSession(dvhSessionId)
                       : null;
@@ -881,6 +904,7 @@ export default function CalculationResultsScreen() {
                       Alert.alert("Plan evaluation", "No DVH data on device");
                       return;
                     }
+                    const { offlineEvaluateComposite } = await import("@/lib/offline-engine");
                     evaluation = offlineEvaluateComposite(bundle, {
                       totalDose,
                       numFractions,

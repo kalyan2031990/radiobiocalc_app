@@ -4,8 +4,8 @@
 
 import { getApiBaseUrl } from "@/constants/oauth";
 import { appFetch } from "@/lib/api-fetch";
-import { isOfflineBuild } from "@/lib/offline-mode";
-import { offlineEngineSelfTest } from "@/lib/offline-engine";
+import { usesLocalEngine } from "@/lib/offline-mode";
+import { mobileBootSelfTest } from "@/lib/mobile-boot-selftest";
 
 export type SelfTestCheck = {
   id: string;
@@ -28,11 +28,11 @@ const NTCP_MAX = 0.95;
 export async function runAppSelfTest(): Promise<SelfTestResult> {
   const checks: SelfTestCheck[] = [];
 
-  if (isOfflineBuild()) {
-    const engine = offlineEngineSelfTest();
+  if (usesLocalEngine()) {
+    const engine = mobileBootSelfTest();
     checks.push({
       id: "offline_engine",
-      label: "Offline radiobiology engine",
+      label: "On-device DVH parser",
       ok: engine.ok,
       detail: engine.detail,
     });

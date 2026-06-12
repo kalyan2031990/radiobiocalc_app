@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Eclipse txt parser characterization > snapshot structure keys stable for Kastoori if present 1`] = `
+[
+  "PTV70new",
+]
+`;

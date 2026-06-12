@@ -51,6 +51,8 @@ app-example
 *.swo
 *~
 
+scripts/debug/
+
 # Logs
 logs
 *.log

@@ -33,6 +33,97 @@ function pct(v: number): string {
 
 export type CompositeEvalCore = Omit<CompositePlanEvaluation, "planExplanation">;
 
+export type SingleStructureExplainInput = {
+  structureType: "target" | "oar";
+  organ: string;
+  model: string;
+  structureName: string;
+  tcp?: number;
+  ntcp?: number;
+  doseMetrics: {
+    meanDose: number;
+    maxDose: number;
+    gEUD: number;
+    d95?: number;
+    d98?: number;
+    d2?: number;
+  };
+  totalDose: number;
+  numFractions: number;
+  technique?: string;
+  bed: number;
+  eqd2: number;
+};
+
+/** rb X narrative for single-structure TCP/NTCP (calculation results screen). */
+export function buildSingleStructureExplanation(
+  input: SingleStructureExplainInput,
+): PlanExplanation {
+  const ctx = {
+    totalDoseGy: input.totalDose,
+    numFractions: input.numFractions,
+    technique: input.technique,
+  };
+  const profile = inferTechniqueProfile(ctx);
+  const stereotactic = stereotacticIndicesApplicable(profile, input.technique);
+  const bullets: ExplanationBullet[] = [];
+  const dm = input.doseMetrics;
+  const dosePerFx = input.totalDose / Math.max(input.numFractions, 1);
+
+  if (input.structureType === "target" && input.tcp != null) {
+    bullets.push({
+      title: "TCP (target control)",
+      detail: `Model ${input.model} on ${input.structureName} (${input.organ}): TCP ${pct(input.tcp)} at ${input.totalDose.toFixed(1)} Gy / ${input.numFractions} fx (${dosePerFx.toFixed(2)} Gy/fx). D95 ${(dm.d95 ?? 0).toFixed(1)} Gy, D98 ${(dm.d98 ?? 0).toFixed(1)} Gy, mean ${dm.meanDose.toFixed(1)} Gy, gEUD ${dm.gEUD.toFixed(1)} Gy.`,
+      citation: "Zaider–Minerbo / LKB TCP — QUANTEC/RTOG literature parameters",
+    });
+  }
+
+  if (input.structureType === "oar" && input.ntcp != null) {
+    bullets.push({
+      title: "NTCP (normal tissue)",
+      detail: `Model ${input.model} on ${input.structureName} (${input.organ}): NTCP ${pct(input.ntcp)}. Mean ${dm.meanDose.toFixed(1)} Gy, max ${dm.maxDose.toFixed(1)} Gy, gEUD ${dm.gEUD.toFixed(1)} Gy.`,
+      citation: "LKB / Poisson — QUANTEC literature parameters",
+    });
+  }
+
+  bullets.push({
+    title: "Fractionation (LQ)",
+    detail: `BED ${input.bed.toFixed(1)} Gy, EQD2 ${input.eqd2.toFixed(1)} Gy for α/β from literature preset.`,
+    citation: "Barendsen LQ; site organ α/β from parameter tables",
+  });
+
+  bullets.push({
+    title: `Technique profile (${indexPackLabel(profile)})`,
+    detail: indexPackClinicalNote(profile, stereotactic),
+    citation: stereotactic
+      ? "Patel et al. RPOR 2020 — SRS/SRT/SBRT indices"
+      : "Lee et al. InTech 2015 — conventional 2 Gy/fx indices",
+  });
+
+  if (input.structureType === "target") {
+    bullets.push({
+      title: "Therapeutic window note",
+      detail:
+        "Composite TCP vs NTCP trade-off (UTCP, P+, TWI) requires target + OAR in one DVH import. Import PTV and OAR together, then open Therapeutic Window from results.",
+      citation: "Lee et al. 2015; Brahme P+; Ågren UTCP",
+    });
+  }
+
+  return {
+    headline: "rb X — explainable structure summary",
+    techniqueProfile: indexPackLabel(profile),
+    indexPackNote: indexPackClinicalNote(profile, stereotactic),
+    bullets,
+    limitations: [
+      "Single structure view — not a full composite plan evaluation.",
+      "TCP/NTCP use literature parameters; clinical covariates are documentation-only unless a future modifier layer is enabled.",
+      "Rule-based XAI (citation-linked narrative) — not PINN/ML attribution on mobile.",
+    ],
+    rbXScope:
+      "The X in rbGyanX means transparent, citation-linked reasoning over your DVH and radiobiology results. This is explainable AI (XAI) without black-box ML on device.",
+  };
+}
+
 export function buildPlanExplanation(
   evaluation: CompositeEvalCore,
   technique?: string,

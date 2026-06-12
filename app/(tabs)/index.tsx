@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 import { useColors } from "@/hooks/use-colors";
 import { APP_TAGLINE } from "@/lib/app-meta";
 import {
-  isOfflineBuild,
+  isDesktopClient,
+  usesLocalEngine,
   isExportServerConfigured,
   OFFLINE_MODE_LABEL,
   OFFLINE_EXPORT_HINT,
@@ -90,14 +91,16 @@ export default function HomeScreen() {
                 Product, validation & roadmap
               </Text>
             </Pressable>
-            {isOfflineBuild() ? (
+            {usesLocalEngine() ? (
               <View className="gap-2 mt-1 w-full px-0">
                 <View
                   className="rounded-lg px-4 py-3"
                   style={{ backgroundColor: "#D1FAE5", borderWidth: 1, borderColor: "#6EE7B7" }}
                 >
                   <Text style={{ color: "#065F46", fontWeight: "600", fontSize: 13 }}>
-                    {OFFLINE_MODE_LABEL}
+                    {isDesktopClient()
+                      ? "Desktop mode — DVH import and TCP/NTCP run in your browser. No emulator required."
+                      : OFFLINE_MODE_LABEL}
                   </Text>
                 </View>
                 <Pressable onPress={() => router.push("/pilot-api-setup")}>

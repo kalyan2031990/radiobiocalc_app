@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { offlineMergeDvhs, offlineParseDvh } from "../lib/offline-engine";
 import { analyzePlanScope } from "../lib/plan-scope";
+import { mergeDvhsOnDevice, parseDvhOnDevice } from "../lib/parse-dvh-mobile";
 
 const files = [
   String.raw`C:\Users\Sampa\OneDrive\Desktop\input_folders\rbgyanx_test_data\PTV_data\KASTOORI_PTV70.txt`,
@@ -56,5 +57,27 @@ const sampleCombined = fs
 if (sampleCombined.length) {
   testSet("Motilal samples from combined_input", sampleCombined);
 }
+
+function testNativeMobile(label: string, paths: string[]) {
+  console.log(`\n=== ${label} (native mobile parser) ===`);
+  const bundles = [];
+  for (const p of paths) {
+    const content = fs.readFileSync(p, "utf8");
+    const name = path.basename(p);
+    const b = parseDvhOnDevice(content, name);
+    const pts = Object.values(b.dvhByStructure).reduce((n, arr) => n + arr.length, 0);
+    console.log(`OK ${name}: ${Object.keys(b.dvhByStructure).join(", ")} (${pts} pts)`);
+    bundles.push(b);
+  }
+  if (bundles.length > 1) {
+    mergeDvhsOnDevice(bundles);
+    console.log(`MERGE OK: ${bundles.length} files`);
+  }
+}
+
+testNativeMobile("Kastoori native", [
+  String.raw`C:\Users\Sampa\OneDrive\Desktop\input_folders\rbgyanx_test_data\PTV_data\KASTOORI_PTV70.txt`,
+  String.raw`C:\Users\Sampa\OneDrive\Desktop\input_folders\rbgyanx_test_data\HN57_OAR_Eclipse\KASTOORI_COM_PRTD.txt`,
+]);
 
 console.log("\nAll DVH parse tests passed.");

@@ -16,8 +16,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { loadPilotApiOverride } from "@/lib/pilot-api-store";
 import { getApiBaseUrl } from "@/constants/oauth";
-import { isOfflineBuild } from "@/lib/offline-mode";
-import { offlineEngineSelfTest } from "@/lib/offline-engine";
+import { isOfflineBuild, usesLocalEngine } from "@/lib/offline-mode";
+import { mobileBootSelfTest } from "@/lib/mobile-boot-selftest";
 import { useColors } from "@/hooks/use-colors";
 
 type ApiClientContextValue = {
@@ -71,14 +71,16 @@ export function ApiClientProvider({ children }: { children: ReactNode }) {
     setTrpcClient((current) => current ?? initTrpcClient());
     try {
       await loadPilotApiOverrideWithTimeout();
-      if (isOfflineBuild()) {
-        const engine = offlineEngineSelfTest();
+      if (usesLocalEngine()) {
+        const engine = mobileBootSelfTest();
         if (!engine.ok) {
           setBootError(engine.detail);
         }
       }
       const base = getApiBaseUrl();
-      setApiBaseUrl(base || (isOfflineBuild() ? "offline://device" : ""));
+      setApiBaseUrl(
+        base || (usesLocalEngine() ? "offline://device" : ""),
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "API client setup failed";
       console.warn("[ApiClientProvider]", msg, e);
@@ -113,7 +115,7 @@ export function ApiClientProvider({ children }: { children: ReactNode }) {
       >
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={{ marginTop: 12, color: colors.muted, textAlign: "center" }}>
-          {isOfflineBuild() ? "Starting offline engine…" : "Loading API settings…"}
+          {usesLocalEngine() ? "Starting offline engine…" : "Loading API settings…"}
         </Text>
       </View>
     );
