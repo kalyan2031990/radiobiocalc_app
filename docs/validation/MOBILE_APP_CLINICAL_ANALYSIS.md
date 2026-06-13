@@ -29,7 +29,7 @@
 
 ## NTCP vs observed toxicity (Parotid, linked cases only)
 
-Covariate layer remains OFF in mobile — values are for traceability only.
+Covariate adjustment is **ON** in mobile batch reports when clinical rows are linked (log-odds manuscript factors).
 
 ## Biological plausibility
 

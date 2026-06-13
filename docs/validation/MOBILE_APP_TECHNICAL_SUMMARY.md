@@ -11,6 +11,14 @@
 - Per-structure probes: LKB log-logistic, LKB probit, Poisson, Zaider–Minerbo, Poisson-LQ (DVH) where literature params exist
 - Composite therapeutic window: TCP + NTCP + TWI
 
+## Composite therapeutic window
+
+TCP + composite NTCP + TWI per case (see engine results table).
+
+## PDF report chart (v1.0.0)
+
+Single therapeutic-window dose–response plot per composite report: TCP and limiting OAR NTCP sigmoids vs dose, Rx marker, shaded band where TCP > NTCP.
+
 ## Model probe counts
 
 - RBX-DCM-001: 49 finite model outputs across 16 structures

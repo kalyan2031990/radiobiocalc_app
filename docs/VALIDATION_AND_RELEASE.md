@@ -1,157 +1,90 @@
 # rbGyanX Mobile — Validation & Release Program
 
-**Product type:** Medical / scientific software for radiobiological plan evaluation (TCP, NTCP, DVH metrics).  
-**Stack:** React Native (Expo) + TypeScript + tRPC API; cross-check against desktop rbGyanX (Python).
-
-**Current app version:** 2.0.0 (see `app.config.ts`, home screen badge).
+**Product:** Medical / scientific software for radiobiological plan evaluation (TCP, NTCP, DVH metrics).  
+**Stack:** React Native (Expo) + TypeScript; offline on-device engine.  
+**Current version:** **1.0.0** (build **15**) — see `app.config.ts`, `lib/app-meta.ts`  
+**GitHub:** https://github.com/kalyan2031990/radiobiocalc_app (tag `v1.0.0`)
 
 **Positioning (pre-regulatory clearance):**
 
-- ✅ Research support tool / plan evaluation assistant / educational radiobiology calculator  
-- ❌ Not marketed as autonomous treatment-authorization software
+- Research support tool / plan evaluation assistant / educational radiobiology calculator  
+- Not marketed as autonomous treatment-authorization software
 
 ---
 
-## 1. Technical testing
+## Validation status (2026-06-13)
 
-### A. Functional testing
+| Gate | Result |
+|------|--------|
+| Engine 17 composite DVHs | **17/17 PASS** |
+| Report export + therapeutic-window chart | **PASS** |
+| Clinical batch PDF (all patients) | **17/17 PASS** |
+| Device DVH import smoke | **PASS** |
+| Full UI smoke (calc results) | **FAIL** (timeout; non-blocking for batch export) |
 
-| Module | What to test |
-|--------|----------------|
-| DVH import | CSV/TXT, composite structures, corrupt/missing files |
-| TCP models | Literature benchmark cases |
-| NTCP models | vs published values / Python engine |
-| EQD2/BED | vs spreadsheet / MATLAB / Python |
-| DVH metrics | Vx, Dx, Dmean, Dmax consistency |
-| Export | PDF/DOCX reports |
-| UI | Invalid inputs, empty fields, navigation |
-
-Maintain **20–50 benchmark cases** in `docs/BENCHMARK_CASES.md` with locked expected outputs.
-
-### B. Numerical validation (priority)
-
-- Hand checks for selected cases  
-- Python/desktop rbGyanX cross-validation  
-- Published paper benchmarks  
-- Repeatability (same DVH → same output)  
-- Optional: interobserver review of interpretation text (rb X)
-
-Suggested metrics: MAE, relative difference (%), ICC, Bland–Altman.
-
-### C. Clinical scenario testing
-
-- Multiple sites (HN, lung, breast, brain, pelvis)  
-- Conventional, hypofractionated, SBRT  
-- Missing OARs, extreme doses  
-- HDR brachytherapy: document scope (EBRT-first mobile)
-
-### D. Device testing
-
-- Small/large Android phones, tablets, low RAM  
-- Android API levels per Play target SDK  
-- iOS device sizes if building for App Store  
-- Web (Expo) for development only unless explicitly supported
-
-**Automated baseline today:** `npm run test:cycle`
+Full methods and PDF archive: see `docs/validation/` and local Desktop package `rbGyanX_v1.0.0_validation_output`.
 
 ---
 
-## 2. Regulatory / clinical risk
+## Test suite (automated)
 
-In-app and store listing must include:
+| Tier | Command | Purpose |
+|------|---------|---------|
+| CI | `npm run test:ci` | Engine smoke, report, DVH parse, PHI check, vitest |
+| Engine | `npm run test:mobile-app-input` | 17-case composite validation + device push |
+| Single clinical | `npm run test:single-clinical-report` | RBX-TXT-001 + covariates + chart |
+| Device smoke | `npm run test:mobile-app-input-device` | adb UI: import → parse → setup |
+| Clinical batch | `npm run test:mobile-clinical-batch-export` | 17 PDFs → PC + phone |
+| Clinical UI smoke | `npm run test:mobile-clinical-device-smoke` | RBX-TXT-001 end-to-end UI |
 
-- Intended use (research/education unless certified)  
-- Version number (shown on home + Product screen)  
-- Equation/model references (Gyan tab, references screen)  
-- Assumptions and limitations  
-- Disclaimer (first launch modal + Product screen)  
-- Audit logs (future): calculation timestamp, model version
+Details: `docs/validation/TEST_SUITE_AND_METHODS.md`
 
 ---
 
-## 3. Beta testing
+## Build & release
 
-**Android:** Play Console internal → closed testing (5–10 physicists, residents, dosimetrists, oncologists).  
-**iOS:** TestFlight after Apple Developer enrollment.
+```bash
+npm run build:android:release
+npm run install:phone
+```
 
+Play Store path: internal testing → closed beta (experts) → production. See `docs/validation/RELEASE_READINESS.md`.
+
+---
+
+## Documentation map
+
+| Document | Content |
+|----------|---------|
+| `docs/validation/MOBILE_APP_VALIDATION.md` | Summary index |
+| `docs/validation/TEST_SUITE_AND_METHODS.md` | Methods |
+| `docs/validation/MOBILE_APP_ENGINE_RESULTS.md` | 17-case table |
+| `docs/validation/MOBILE_APP_DEVICE_SMOKE.md` | Smoke results |
+| `docs/validation/CLINICAL_BATCH_EXPORT.md` | PDF batch log |
+| `docs/validation/MOBILE_APP_TECHNICAL_SUMMARY.md` | Architecture |
+| `docs/validation/RELEASE_READINESS.md` | Pilot → Play Store |
+| `docs/MOBILE_USER_GUIDE.md` | End-user guide |
+| `docs/LOCAL_ANDROID_BUILD.md` | APK build |
+| `samples/README.md` | One bundled input + reference PDF |
+
+---
+
+## Beta testing (next)
+
+**Android:** Play Console internal → closed testing (5–10 physicists, residents, dosimetrists).  
 Collect: wrong outputs, UI issues, missing structures, feature requests.
 
 ---
 
-## 4. Android release (Google Play)
+## Regulatory / clinical risk
 
-1. Developer account  
-2. Signed `.aab` (`eas build` / `npm run build:android`)  
-3. Store listing, screenshots, feature graphic  
-4. Privacy policy URL  
-5. Content rating  
-6. Internal → closed → production rollout  
-
-Console: https://play.google.com/console/
+In-app and store listing must include intended use, version, model references, limitations, disclaimer.  
+Exported reports include research/educational disclaimer.
 
 ---
 
-## 5. iOS release
-
-Requires Mac or cloud Mac, signing, multi-size screenshots.
-
-Archive → TestFlight → App Store review.
-
-Program: https://developer.apple.com/programs/
-
----
-
-## 6. Clinical documentation package
-
-Prepare **Validation Report** (PDF) with:
-
-1. Algorithms and equations  
-2. Literature references  
-3. Datasets (anonymised)  
-4. Methodology  
-5. Results (tables, Bland–Altman)  
-6. Known limitations  
-7. Version history  
-
-Supports publications, ethics, hospital review.
-
----
-
-## 7. Security / privacy (DICOM / PHI)
+## Security / privacy
 
 - De-identify before import on mobile  
-- Prefer local processing; no cloud upload by default  
-- Encrypt stored sessions (roadmap)  
-- Privacy policy page before production
-
----
-
-## 8. Publication angle
-
-Example title: *Development and Validation of a Mobile Application for Radiobiological Plan Evaluation Using TCP, NTCP, and DVH-Based Metrics*
-
-Include accuracy study, usability, comparison vs TPS/Python/desktop rbGyanX.
-
----
-
-## Suggested timeline
-
-| Week | Focus |
-|------|--------|
-| 1–2 | Numerical validation vs Python/desktop |
-| 3 | Clinical benchmark matrix |
-| 4 | Beta with physicists |
-| 5 | Disclaimer + validation report draft |
-| 6 | Android closed testing |
-| 7–8 | Production release (if metrics pass) |
-
----
-
-## Repository anchors
-
-| Item | Path |
-|------|------|
-| App version | `app.config.ts`, `lib/app-meta.ts` |
-| Validation reports | `docs/validation/` |
-| Test scripts | `scripts/run_*` (see `package.json`) |
-| User guide | `docs/MOBILE_USER_GUIDE.md` |
+- Local processing; no cloud upload by default  
+- Privacy policy required before production Play listing
