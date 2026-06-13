@@ -245,7 +245,7 @@ export function ClinicalContextForm({
               </Text>
               <Text className="text-xs" style={{ color: colors.muted }}>
                 {roleLabel} · {organ} — {fields.length} fields available
-                {hasAny ? " · recorded" : ""}
+                {hasAny ? " · adjusts TCP/NTCP" : ""}
               </Text>
             </View>
           </View>

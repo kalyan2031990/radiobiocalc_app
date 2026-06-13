@@ -1,75 +1,106 @@
 /**
- * Minimal DOCX (OOXML zip) without external dependencies — Word-compatible report.
+ * Minimal DOCX (OOXML zip) — Word-compatible, no Node Buffer required.
  */
 
-function crc32(buf: Buffer): number {
+function crc32(buf: Uint8Array): number {
   let c = ~0;
   for (let i = 0; i < buf.length; i++) {
-    c ^= buf[i];
+    c ^= buf[i]!;
     for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
   }
   return ~c >>> 0;
 }
 
-function zipStore(files: { name: string; data: Buffer }[]): Buffer {
-  const parts: Buffer[] = [];
-  const central: Buffer[] = [];
+function u16(n: number): number {
+  return n & 0xffff;
+}
+
+function writeU32LE(view: DataView, offset: number, value: number) {
+  view.setUint32(offset, value >>> 0, true);
+}
+
+function writeU16LE(view: DataView, offset: number, value: number) {
+  view.setUint16(offset, u16(value), true);
+}
+
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
+  return out;
+}
+
+function utf8Bytes(s: string): Uint8Array {
+  return new TextEncoder().encode(s);
+}
+
+function zipStore(files: { name: string; data: Uint8Array }[]): Uint8Array {
+  const parts: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
   let offset = 0;
 
   for (const f of files) {
-    const name = Buffer.from(f.name, "utf8");
+    const name = utf8Bytes(f.name);
     const data = f.data;
     const c = crc32(data);
-    const local = Buffer.alloc(30 + name.length);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(0, 6);
-    local.writeUInt16LE(0, 8);
-    local.writeUInt16LE(0, 10);
-    local.writeUInt32LE(c, 14);
-    local.writeUInt32LE(data.length, 18);
-    local.writeUInt32LE(data.length, 22);
-    local.writeUInt16LE(name.length, 26);
-    local.writeUInt16LE(0, 28);
-    name.copy(local, 30);
+    const local = new Uint8Array(30 + name.length);
+    const lv = new DataView(local.buffer);
+    writeU32LE(lv, 0, 0x04034b50);
+    writeU16LE(lv, 4, 20);
+    writeU16LE(lv, 6, 0);
+    writeU16LE(lv, 8, 0);
+    writeU16LE(lv, 10, 0);
+    writeU32LE(lv, 14, c);
+    writeU32LE(lv, 18, data.length);
+    writeU32LE(lv, 22, data.length);
+    writeU16LE(lv, 26, name.length);
+    writeU16LE(lv, 28, 0);
+    local.set(name, 30);
     parts.push(local, data);
-    const cen = Buffer.alloc(46 + name.length);
-    cen.writeUInt32LE(0x02014b50, 0);
-    cen.writeUInt16LE(20, 4);
-    cen.writeUInt16LE(20, 6);
-    cen.writeUInt16LE(0, 8);
-    cen.writeUInt16LE(0, 10);
-    cen.writeUInt16LE(0, 12);
-    cen.writeUInt32LE(c, 16);
-    cen.writeUInt32LE(data.length, 20);
-    cen.writeUInt32LE(data.length, 24);
-    cen.writeUInt16LE(name.length, 28);
-    cen.writeUInt16LE(0, 30);
-    cen.writeUInt16LE(0, 32);
-    cen.writeUInt16LE(0, 34);
-    cen.writeUInt16LE(0, 36);
-    cen.writeUInt32LE(0, 38);
-    cen.writeUInt32LE(offset, 42);
-    name.copy(cen, 46);
+
+    const cen = new Uint8Array(46 + name.length);
+    const cv = new DataView(cen.buffer);
+    writeU32LE(cv, 0, 0x02014b50);
+    writeU16LE(cv, 4, 20);
+    writeU16LE(cv, 6, 20);
+    writeU16LE(cv, 8, 0);
+    writeU16LE(cv, 10, 0);
+    writeU16LE(cv, 12, 0);
+    writeU32LE(cv, 16, c);
+    writeU32LE(cv, 20, data.length);
+    writeU32LE(cv, 24, data.length);
+    writeU16LE(cv, 28, name.length);
+    writeU16LE(cv, 30, 0);
+    writeU16LE(cv, 32, 0);
+    writeU16LE(cv, 34, 0);
+    writeU16LE(cv, 36, 0);
+    writeU32LE(cv, 38, 0);
+    writeU32LE(cv, 42, offset);
+    cen.set(name, 46);
     central.push(cen);
     offset += local.length + data.length;
   }
 
-  const centralDir = Buffer.concat(central);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(0, 4);
-  end.writeUInt16LE(0, 6);
-  end.writeUInt16LE(files.length, 8);
-  end.writeUInt16LE(files.length, 10);
-  end.writeUInt32LE(centralDir.length, 12);
-  end.writeUInt32LE(offset, 16);
-  end.writeUInt16LE(0, 20);
+  const centralDir = concatBytes(central);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  writeU32LE(ev, 0, 0x06054b50);
+  writeU16LE(ev, 4, 0);
+  writeU16LE(ev, 6, 0);
+  writeU16LE(ev, 8, files.length);
+  writeU16LE(ev, 10, files.length);
+  writeU32LE(ev, 12, centralDir.length);
+  writeU32LE(ev, 16, offset);
+  writeU16LE(ev, 20, 0);
 
-  return Buffer.concat([...parts, centralDir, end]);
+  return concatBytes([...parts, centralDir, end]);
 }
 
-export function buildDocxFromText(title: string, body: string): Buffer {
+export function buildDocxFromText(title: string, body: string): Uint8Array {
   const escape = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const paragraphs = body.split("\n").map(
@@ -94,10 +125,9 @@ ${paragraphs.join("")}
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>`;
 
-  const docBuf = Buffer.from(documentXml, "utf8");
   return zipStore([
-    { name: "[Content_Types].xml", data: Buffer.from(contentTypes, "utf8") },
-    { name: "_rels/.rels", data: Buffer.from(rels, "utf8") },
-    { name: "word/document.xml", data: docBuf },
+    { name: "[Content_Types].xml", data: utf8Bytes(contentTypes) },
+    { name: "_rels/.rels", data: utf8Bytes(rels) },
+    { name: "word/document.xml", data: utf8Bytes(documentXml) },
   ]);
 }

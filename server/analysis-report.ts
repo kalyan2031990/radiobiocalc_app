@@ -4,11 +4,13 @@
 
 import { getProvenanceFor } from "./literature-references";
 import { buildDocxFromText } from "./docx-builder";
+import { bytesToBase64 } from "../lib/base64-bytes";
 import {
   clinicalReportDisclaimer,
   clinicalReportSiteLabel,
   type ClinicalReportSection,
 } from "../lib/clinical-report-sections";
+import { chartDocxSummaryLines } from "../lib/enrich-report-charts";
 
 export type AnalysisReportInput = {
   patientId: string;
@@ -23,6 +25,11 @@ export type AnalysisReportInput = {
   numFractions: number;
   tcp?: number;
   ntcp?: number;
+  /** When covariate adjustment applied */
+  baseTcp?: number;
+  baseNtcp?: number;
+  covariatesApplied?: boolean;
+  clinicalDataNote?: string;
   bed: number;
   eqd2: number;
   meanDose: number;
@@ -32,6 +39,29 @@ export type AnalysisReportInput = {
   /** Opt-in: site- and structure-specific clinical presets in PDF/DOCX */
   includeClinicalInReport?: boolean;
   clinicalSections?: ClinicalReportSection[];
+  /** Full composite plan (all structures from DVH session) */
+  isCompositePlan?: boolean;
+  structureCount?: number;
+  primaryStructureName?: string;
+  compositeStructures?: Array<{
+    structureName: string;
+    structureType: "target" | "oar";
+    organ: string;
+    model: string;
+    probabilityLabel: string;
+    meanDose: string;
+    maxDose: string;
+    d95: string;
+    doseMetricRows: { label: string; value: string; note?: string }[];
+  }>;
+  planIndexRows?: { label: string; value: string; note?: string }[];
+  therapeuticSummaryLines?: string[];
+  /** Composite plan therapeutic window (uncapped TCP, composite NTCP). */
+  planTherapeuticTcp?: number;
+  planTherapeuticNtcp?: number;
+  therapeuticWindowChartParams?: import("../lib/report-chart-svg").TherapeuticWindowDoseResponseParams;
+  therapeuticWindowChartSvg?: string;
+  therapeuticWindowChartCaption?: string;
 };
 
 export type AnalysisReportOutput = {
@@ -52,8 +82,20 @@ export function buildAnalysisReport(input: AnalysisReportInput): AnalysisReportO
         ? `NTCP ${(input.ntcp * 100).toFixed(1)}%`
         : "NTCP —";
 
+  const covariateNote =
+    input.covariatesApplied && input.structureType === "target" && input.baseTcp != null && input.tcp != null
+      ? ` (base ${(input.baseTcp * 100).toFixed(1)}% → covariate-adjusted ${(input.tcp * 100).toFixed(1)}%)`
+      : input.covariatesApplied && input.structureType === "oar" && input.baseNtcp != null && input.ntcp != null
+        ? ` (base ${(input.baseNtcp * 100).toFixed(1)}% → covariate-adjusted ${(input.ntcp * 100).toFixed(1)}%)`
+        : "";
+
+  const clinicalSourceLine = input.clinicalDataNote
+    ? `<p><em>Clinical data: ${escapeHtml(input.clinicalDataNote)}</em></p>`
+    : "";
+
   const generatedAt = new Date().toISOString();
-  const filenameBase = `rbGyanX_${input.patientId}_${input.structureName}`.replace(
+  const filenameSuffix = input.isCompositePlan ? "composite" : input.structureName;
+  const filenameBase = `rbGyanX_${input.patientId}_${filenameSuffix}`.replace(
     /[^a-zA-Z0-9_-]/g,
     "_",
   );
@@ -75,11 +117,20 @@ export function buildAnalysisReport(input: AnalysisReportInput): AnalysisReportO
         input.clinicalSections ?? [],
         input.cancerSite,
         includeClinical,
+        input.covariatesApplied,
       )
     : "";
   const clinicalDocx = includeClinical
-    ? formatClinicalDocx(input.clinicalSections ?? [], input.cancerSite, includeClinical)
+    ? formatClinicalDocx(
+        input.clinicalSections ?? [],
+        input.cancerSite,
+        includeClinical,
+        input.covariatesApplied,
+      )
     : [];
+
+  const compositeHtml = formatCompositeHtml(input);
+  const compositeDocx = formatCompositeDocx(input);
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><title>rbGyanX Report</title>
@@ -89,6 +140,8 @@ h1{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:8px}
 table{border-collapse:collapse;width:100%;margin:12px 0}
 th,td{border:1px solid #ddd;padding:8px;text-align:left}
 th{background:#e8eef4}
+.chart-block{margin:20px 0;text-align:center}
+.chart-block svg{max-width:100%;height:auto}
 .disclaimer{font-size:11px;color:#666;margin-top:24px}
 </style></head><body>
 <h1>rbGyanX — Plan Evaluation Report</h1>
@@ -100,12 +153,15 @@ Plan: ${escapeHtml(input.planLabel)}<br/>
 Site: ${escapeHtml(input.cancerSite)} · Technique: ${escapeHtml(input.technique)}<br/>
 Fractionation: ${input.totalDose} Gy / ${input.numFractions} fx</p>
 <h2>Structure</h2>
-<p>${escapeHtml(input.structureName)} (${input.structureType}) · Literature organ: ${escapeHtml(input.organ)}</p>
+<p>${escapeHtml(input.structureName)} (${input.structureType}) · Literature organ: ${escapeHtml(input.organ)}${input.isCompositePlan && input.structureCount ? ` · Composite plan (${input.structureCount} structures)` : ""}</p>
 <h2>Radiobiology (${escapeHtml(prov?.modelLabel ?? input.model)})</h2>
-<p><strong>${prob}</strong> · BED ${input.bed.toFixed(2)} Gy · EQD2 ${input.eqd2.toFixed(2)} Gy</p>
+<p><strong>${prob}${covariateNote}</strong> · BED ${input.bed.toFixed(2)} Gy · EQD2 ${input.eqd2.toFixed(2)} Gy</p>
+${clinicalSourceLine}
 <p>Mean ${input.meanDose.toFixed(2)} Gy · Max ${input.maxDose.toFixed(2)} Gy · gEUD ${input.gEUD.toFixed(2)} Gy</p>
 <h2>Dose metrics (QUANTEC-oriented)</h2>
 <table><tr><th>Metric</th><th>Value</th><th>Note</th></tr>${metricRows}</table>
+${formatChartsHtml(input)}
+${compositeHtml}
 ${clinicalHtml}
 ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitation)}</p>` : ""}
 <h2>References</h2><ul>${refs}</ul>
@@ -124,13 +180,21 @@ ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitat
     `Structure: ${input.structureName} (${input.structureType})`,
     `Organ: ${input.organ}`,
     `Model: ${prov?.modelLabel ?? input.model}`,
-    prob,
+    `${prob}${covariateNote}`,
     `BED ${input.bed.toFixed(2)} Gy, EQD2 ${input.eqd2.toFixed(2)} Gy`,
     `Mean ${input.meanDose.toFixed(2)} Gy, Max ${input.maxDose.toFixed(2)} Gy, gEUD ${input.gEUD.toFixed(2)} Gy`,
     "",
     "Dose metrics:",
     ...input.doseMetricRows.map((r) => `  ${r.label}: ${r.value}${r.note ? ` (${r.note})` : ""}`),
     "",
+    ...(() => {
+      const chartLines = chartDocxSummaryLines(input);
+      return chartLines.length
+        ? ["Visualizations:", ...chartLines, ""]
+        : [];
+    })(),
+    ...compositeDocx,
+    ...(compositeDocx.length ? [""] : []),
     ...clinicalDocx,
     ...(clinicalDocx.length ? [""] : []),
     "References:",
@@ -145,9 +209,17 @@ ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitat
   return {
     html,
     docxText,
-    docxBase64: docxBuf.toString("base64"),
+    docxBase64: bytesToBase64(docxBuf),
     filenameBase,
   };
+}
+
+function formatChartsHtml(input: AnalysisReportInput): string {
+  if (!input.therapeuticWindowChartSvg) return "";
+  return (
+    `<h2>${escapeHtml(input.therapeuticWindowChartCaption ?? "Therapeutic window")}</h2>` +
+    `<div class="chart-block">${input.therapeuticWindowChartSvg}</div>`
+  );
 }
 
 function escapeHtml(s: string): string {
@@ -162,8 +234,9 @@ function formatClinicalHtml(
   sections: ClinicalReportSection[],
   cancerSite: string,
   includeClinical: boolean,
+  covariatesApplied?: boolean,
 ): string {
-  const disclaimer = clinicalReportDisclaimer(includeClinical);
+  const disclaimer = clinicalReportDisclaimer(includeClinical, covariatesApplied);
   const siteLabel = clinicalReportSiteLabel(cancerSite);
   let body = `<h2>Clinical context (opt-in)</h2>
 <p><em>Cancer site: ${escapeHtml(siteLabel)}</em></p>
@@ -191,11 +264,12 @@ function formatClinicalDocx(
   sections: ClinicalReportSection[],
   cancerSite: string,
   includeClinical: boolean,
+  covariatesApplied?: boolean,
 ): string[] {
   const lines: string[] = [
     "Clinical context (opt-in)",
     `Cancer site: ${clinicalReportSiteLabel(cancerSite)}`,
-    clinicalReportDisclaimer(includeClinical),
+    clinicalReportDisclaimer(includeClinical, covariatesApplied),
     "",
   ];
   if (sections.length === 0) {
@@ -209,5 +283,97 @@ function formatClinicalDocx(
     }
     lines.push("");
   }
+  return lines;
+}
+
+function formatCompositeHtml(input: AnalysisReportInput): string {
+  if (!input.isCompositePlan || !input.compositeStructures?.length) return "";
+
+  const summaryRows = input.compositeStructures
+    .map(
+      (s) =>
+        `<tr><td>${escapeHtml(s.structureName)}</td><td>${s.structureType}</td>` +
+        `<td>${escapeHtml(s.organ)}</td><td>${escapeHtml(s.model)}</td>` +
+        `<td>${escapeHtml(s.probabilityLabel)}</td><td>${escapeHtml(s.meanDose)}</td>` +
+        `<td>${escapeHtml(s.maxDose)}</td><td>${escapeHtml(s.d95)}</td></tr>`,
+    )
+    .join("");
+
+  let body = `<h2>Composite plan — all structures</h2>
+<p>Primary target: ${escapeHtml(input.primaryStructureName ?? "—")}</p>
+<table><tr><th>Structure</th><th>Type</th><th>Organ</th><th>Model</th><th>TCP/NTCP</th><th>Dmean</th><th>Dmax</th><th>D95</th></tr>${summaryRows}</table>`;
+
+  for (const s of input.compositeStructures) {
+    const rows = s.doseMetricRows
+      .map(
+        (r) =>
+          `<tr><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.value)}</td><td>${escapeHtml(r.note ?? "")}</td></tr>`,
+      )
+      .join("");
+    body += `<h3>${escapeHtml(s.structureName)} — physical indices</h3>
+<table><tr><th>Metric</th><th>Value</th><th>Note</th></tr>${rows}</table>`;
+  }
+
+  if (input.planIndexRows?.length) {
+    const piRows = input.planIndexRows
+      .map(
+        (r) =>
+          `<tr><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.value)}</td><td>${escapeHtml(r.note ?? "")}</td></tr>`,
+      )
+      .join("");
+    body += `<h2>Target plan indices</h2>
+<table><tr><th>Index</th><th>Value</th><th>Note</th></tr>${piRows}</table>`;
+  }
+
+  if (input.therapeuticSummaryLines?.length) {
+    body += `<h2>Therapeutic window</h2><ul>${input.therapeuticSummaryLines
+      .map((l) => `<li>${escapeHtml(l)}</li>`)
+      .join("")}</ul>`;
+  }
+
+  return body;
+}
+
+function formatCompositeDocx(input: AnalysisReportInput): string[] {
+  if (!input.isCompositePlan || !input.compositeStructures?.length) return [];
+
+  const lines: string[] = [
+    "Composite plan — all structures",
+    `Primary target: ${input.primaryStructureName ?? "—"}`,
+    "",
+    "Structure summary:",
+  ];
+
+  for (const s of input.compositeStructures) {
+    lines.push(
+      `  ${s.structureName} (${s.structureType}) · ${s.organ} · ${s.model} · ${s.probabilityLabel} · Dmean ${s.meanDose} · Dmax ${s.maxDose} · D95 ${s.d95}`,
+    );
+  }
+  lines.push("");
+
+  for (const s of input.compositeStructures) {
+    lines.push(`${s.structureName} — physical indices:`);
+    for (const r of s.doseMetricRows) {
+      lines.push(`  ${r.label}: ${r.value}${r.note ? ` (${r.note})` : ""}`);
+    }
+    lines.push("");
+  }
+
+  if (input.planIndexRows?.length) {
+    lines.push("Target plan indices:");
+    for (const r of input.planIndexRows) {
+      lines.push(`  ${r.label}: ${r.value}${r.note ? ` (${r.note})` : ""}`);
+    }
+    lines.push("");
+  }
+
+  if (input.therapeuticSummaryLines?.length) {
+    lines.push("Therapeutic window:");
+    for (const l of input.therapeuticSummaryLines) {
+      lines.push(`  ${l}`);
+    }
+    lines.push("");
+  }
+
   return lines;
 }

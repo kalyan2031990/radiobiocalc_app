@@ -152,7 +152,6 @@ Include accuracy study, usability, comparison vs TPS/Python/desktop rbGyanX.
 | Item | Path |
 |------|------|
 | App version | `app.config.ts`, `lib/app-meta.ts` |
-| Feature roadmap (in-app) | `lib/feature-roadmap.ts` |
-| Test cycle | `scripts/run_phase_cycle.ts` |
-| Help (draft) | `docs/USER_HELP.md` |
-| Benchmark registry | `docs/BENCHMARK_CASES.md` |
+| Validation reports | `docs/validation/` |
+| Test scripts | `scripts/run_*` (see `package.json`) |
+| User guide | `docs/MOBILE_USER_GUIDE.md` |

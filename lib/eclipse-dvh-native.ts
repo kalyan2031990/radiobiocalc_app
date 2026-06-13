@@ -2,6 +2,11 @@
  * Standalone Eclipse .txt DVH parser for Android — no server/ bundle imports.
  */
 
+import {
+  isCompositeDvh,
+  parseCompositeDvhContent,
+} from "@/lib/composite-dvh-parse";
+
 export type NativeDvhPoint = { dose: number; volume: number };
 
 export type NativeParsedDvh = {
@@ -176,11 +181,14 @@ export function parseEclipseTxtNative(
 }
 
 export function parseDvhTextNative(content: string, fileName: string): NativeParsedDvh {
+  if (isCompositeDvh(content)) {
+    return parseCompositeDvhContent(content, fileName) as NativeParsedDvh;
+  }
   if (isEclipseTxt(content)) {
     return parseEclipseTxtNative(content, fileName);
   }
   throw new Error(
-    `Unsupported DVH format in ${fileName}. Use Varian Eclipse .txt export.`,
+    `Unsupported DVH format in ${fileName}. Use Varian Eclipse .txt or rbGyanX composite export.`,
   );
 }
 

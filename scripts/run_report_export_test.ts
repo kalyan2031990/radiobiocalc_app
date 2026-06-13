@@ -22,10 +22,38 @@ const report = buildAnalysisReport({
   gEUD: 26,
   doseMetricRows: [{ label: "Dmean", value: "26 Gy", note: "" }],
   includeClinicalInReport: false,
+  isCompositePlan: true,
+  structureCount: 3,
+  planTherapeuticTcp: 0.88,
+  planTherapeuticNtcp: 0.15,
+  therapeuticWindowChartParams: {
+    prescriptionDose: 70,
+    planTcp: 0.88,
+    planNtcp: 0.15,
+    tcpStructure: "PTV70",
+    tcpOrgan: "PTV",
+    tcpModel: "poisson_dvh",
+    tcpTd50: 70,
+    tcpGamma: 1.5,
+    ntcpOrgan: "Parotid",
+    ntcpStructure: "Parotid_L",
+    ntcpModel: "lkb_loglogit",
+    ntcpTd50: 28,
+    ntcpGamma: 1.2,
+  },
+  therapeuticWindowChartSvg: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect width="100" height="50" fill="#ddd"/></svg>',
 });
 
 if (!report.html.includes("rbGyanX")) {
   console.error("FAIL: missing HTML branding");
+  process.exit(1);
+}
+if (!report.html.includes("<svg")) {
+  console.error("FAIL: missing chart SVG in HTML");
+  process.exit(1);
+}
+if (!report.docxText.includes("Visualizations:")) {
+  console.error("FAIL: missing chart summary in DOCX text");
   process.exit(1);
 }
 if (!report.docxBase64 || report.docxBase64.length < 100) {

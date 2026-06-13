@@ -1,6 +1,7 @@
 import { Text, type TextProps } from "react-native";
 import { useColors } from "@/hooks/use-colors";
-import { getVersionLine } from "@/lib/app-meta";
+import { getUserVersionLine, getVersionLine } from "@/lib/app-meta";
+import { isClinicianMobileApk } from "@/lib/clinician-build";
 
 type Props = TextProps & { centered?: boolean };
 
@@ -18,7 +19,7 @@ export function AppVersionBadge({ centered, style, ...rest }: Props) {
       ]}
       {...rest}
     >
-      {getVersionLine()}
+      {isClinicianMobileApk() ? getUserVersionLine() : getVersionLine()}
     </Text>
   );
 }

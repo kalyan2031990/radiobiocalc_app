@@ -3,6 +3,8 @@
  * Lee et al. (Niemierko TCP/NTCP); desktop engine/radiobiology/utcp.py.
  */
 
+import { capTcpForDisplay } from "@/lib/tcp-display";
+
 export type OarNtcpEntry = {
   structureName: string;
   literatureOrgan: string;
@@ -11,7 +13,11 @@ export type OarNtcpEntry = {
 };
 
 export type TherapeuticWindowResult = {
+  /** Display TCP (capped for clinician UI). */
   tcp: number;
+  /** Uncapped model TCP (0–1). */
+  tcpRaw: number;
+  tcpCapped: boolean;
   tcpModel: string;
   tcpStructure: string;
   ntcpComposite: number;
@@ -81,7 +87,7 @@ export function computeTherapeuticWindow(
   tcpStructure: string,
   oarEntries: OarNtcpEntry[],
 ): TherapeuticWindowResult {
-  const tcpC = Math.min(1, Math.max(0, tcp));
+  const { display: tcpC, raw: tcpRaw, capped: tcpCapped } = capTcpForDisplay(tcp);
   const entries = oarEntries.map((e) => ({
     ...e,
     ntcp: Math.min(1, Math.max(0, e.ntcp)),
@@ -110,6 +116,8 @@ export function computeTherapeuticWindow(
 
   return {
     tcp: tcpC,
+    tcpRaw,
+    tcpCapped,
     tcpModel,
     tcpStructure,
     ntcpComposite: ntcpMax,

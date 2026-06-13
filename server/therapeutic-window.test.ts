@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeTherapeuticWindow } from "../lib/therapeutic-window";
 
-/** Single UTCP path — no legacy code7 duplicate in this repo (see docs/GAP_AUDIT.md). */
+/** Single UTCP path — no legacy duplicate in this repo. */
 describe("therapeutic window / UTCP consistency", () => {
   it("UTCP equals TCP × Π(1−NTCP_k) and matches CFTC product form", () => {
     const oars = [
@@ -19,5 +19,14 @@ describe("therapeutic window / UTCP consistency", () => {
     const tw = computeTherapeuticWindow(0.9, "poisson", "PTV", []);
     expect(tw.utcp).toBeCloseTo(0.9, 8);
     expect(tw.ntcpComposite).toBe(0);
+    expect(tw.tcpRaw).toBeCloseTo(0.9, 8);
+  });
+
+  it("caps display TCP at 95% when model saturates", () => {
+    const tw = computeTherapeuticWindow(1.0, "poisson_dvh", "PTV", []);
+    expect(tw.tcp).toBeCloseTo(0.95, 8);
+    expect(tw.tcpRaw).toBeCloseTo(1, 8);
+    expect(tw.tcpCapped).toBe(true);
+    expect(tw.utcp).toBeCloseTo(0.95, 8);
   });
 });

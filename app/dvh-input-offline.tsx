@@ -14,15 +14,16 @@ import {
   PermissionsAndroid,
   InteractionManager,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useCallback, useRef, useState } from "react";
 import type { ParsedDvhBundle } from "@/lib/dvh-bundle-types";
 import type { ListedDvhFile } from "@/lib/list-download-dvh";
-import { getVersionLine } from "@/lib/app-meta";
-import { KASTOORI_PAIR_PATHS } from "@/lib/known-download-dvh";
-import { BUNDLED_KASTOORI_PTV70_SAMPLE } from "@/lib/bundled-test-dvh";
+import { getUserVersionLine, getVersionLine } from "@/lib/app-meta";
+import { isClinicianMobileApk, showDeveloperTools } from "@/lib/clinician-build";
+import { formatImportedPlanLabel } from "@/lib/user-facing-labels";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,7 +60,7 @@ export default function DVHInputOfflineScreen() {
     setReady(true);
     const stats = summarizeDvhBundle(data);
     setSummary({
-      fileLabel,
+      fileLabel: formatImportedPlanLabel(fileLabel),
       structureCount: stats.structureCount,
       pointCount: stats.pointCount,
     });
@@ -96,11 +97,19 @@ export default function DVHInputOfflineScreen() {
   );
 
   const requestStoragePermission = async (): Promise<void> => {
-    if (Platform.OS !== "android" || Platform.Version >= 33) return;
+    if (Platform.OS !== "android") return;
     try {
-      await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-      );
+      if (Platform.Version >= 33) {
+        await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_AUDIO,
+        ]);
+      } else {
+        await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+        );
+      }
     } catch {
       /* optional */
     }
@@ -117,8 +126,8 @@ export default function DVHInputOfflineScreen() {
       setStatus(null);
       if (files.length === 0) {
         Alert.alert(
-          "No .txt in Downloads",
-          "Copy Eclipse DVH .txt files to Download/rbgyanx_test on this device (USB, cloud, or email → Save), then tap Refresh.",
+          "No plan files found",
+          "Copy PTV and OAR .txt files to your Downloads folder (USB, email, or cloud), then tap Refresh.",
         );
       }
     } catch (e) {
@@ -128,12 +137,33 @@ export default function DVHInputOfflineScreen() {
   }, []);
 
   const handleBundledTest = async () => {
+    if (!showDeveloperTools()) return;
     try {
       setLoading(true);
+      const { BUNDLED_KASTOORI_PTV70_SAMPLE } = await import("@/lib/bundled-test-dvh");
       await runParse([BUNDLED_KASTOORI_PTV70_SAMPLE], ["bundled_KASTOORI_PTV70.txt"]);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Parse failed";
       Alert.alert("Bundled test failed", msg);
+    } finally {
+      setLoading(false);
+      setStatus(null);
+    }
+  };
+
+  const handleLoadKastooriPair = async () => {
+    if (!showDeveloperTools()) return;
+    try {
+      setLoading(true);
+      const { KASTOORI_PAIR_PATHS } = await import("@/lib/known-download-dvh");
+      const { contents, labels } = await readPaths(KASTOORI_PAIR_PATHS);
+      await runParse(contents, labels);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Load failed";
+      Alert.alert(
+        "Could not load test files",
+        `${msg}\n\nCopy PTV and OAR .txt files to Download/rbgyanx_test/ on this device.`,
+      );
     } finally {
       setLoading(false);
       setStatus(null);
@@ -174,17 +204,68 @@ export default function DVHInputOfflineScreen() {
     }
   };
 
-  const handleLoadKastooriPair = async () => {
+  const handlePickDvhFiles = async () => {
     try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["text/plain", "application/octet-stream", "*/*"],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
       setLoading(true);
-      const { contents, labels } = await readPaths(KASTOORI_PAIR_PATHS);
+      const { readDocumentContent } = await import("@/lib/read-document-content");
+      const contents: string[] = [];
+      const labels: string[] = [];
+      for (const asset of result.assets) {
+        if (!/\.txt$/i.test(asset.name ?? "")) continue;
+        setStatus(`Reading ${asset.name ?? "file"}…`);
+        await yieldToUi();
+        const text = await readDocumentContent(asset);
+        if (text.trim().length < 50) {
+          throw new Error(`File empty or unreadable: ${asset.name ?? "file"}`);
+        }
+        contents.push(text);
+        labels.push(asset.name ?? "dvh.txt");
+      }
+      if (contents.length === 0) {
+        Alert.alert("No plan files", "Select PTV and OAR .txt exports.");
+        return;
+      }
       await runParse(contents, labels);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Load failed";
+      Alert.alert("Error", error instanceof Error ? error.message : "Could not read files");
+    } finally {
+      setLoading(false);
+      setStatus(null);
+    }
+  };
+
+  const handleMergeAllListed = async () => {
+    if (downloadFiles.length < 2) {
       Alert.alert(
-        "Could not load Kastoori test files",
-        `${msg}\n\nCopy KASTOORI_PTV70.txt and KASTOORI_COM_PRTD.txt to Download/rbgyanx_test/ on this device.`,
+        "Need PTV and OAR files",
+        "Copy both .txt exports to Downloads, tap Refresh, then use Import combined plan.",
       );
+      return;
+    }
+    try {
+      setLoading(true);
+      const contents: string[] = [];
+      const labels: string[] = [];
+      const { readDeviceFilePath } = await import("@/lib/read-document-content");
+      for (const file of downloadFiles) {
+        setStatus(`Reading ${file.name}…`);
+        await yieldToUi();
+        const text = await readDeviceFilePath(file.uri);
+        if (text.trim().length < 50) {
+          throw new Error(`File empty or unreadable: ${file.name}`);
+        }
+        contents.push(text);
+        labels.push(file.name);
+      }
+      await runParse(contents, labels);
+    } catch (error) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Merge failed");
     } finally {
       setLoading(false);
       setStatus(null);
@@ -227,17 +308,36 @@ export default function DVHInputOfflineScreen() {
             </Text>
           </Pressable>
 
-          <Text style={{ color: colors.muted, fontSize: 12 }}>{getVersionLine()}</Text>
+          <Text style={{ color: colors.muted, fontSize: 12 }}>
+            {isClinicianMobileApk() ? getUserVersionLine() : getVersionLine()}
+          </Text>
 
           <Text style={{ color: colors.foreground, fontSize: 20, fontWeight: "700" }}>
             Import plan DVH
           </Text>
           <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 20 }}>
-            Varian Eclipse .txt only. Copy files to{" "}
-            <Text style={{ fontWeight: "600" }}>Download/rbgyanx_test</Text> on this device,
-            then tap a file below. Do not use the Android system file picker — it crashes on many
-            devices.
+            Copy composite DVH .txt (or separate PTV + OAR files) to{" "}
+            <Text style={{ fontWeight: "600" }}>Downloads</Text> or{" "}
+            <Text style={{ fontWeight: "600" }}>Downloads/rbGyaX_mobile_app_input</Text>,
+            refresh the list, then tap one composite file or{" "}
+            <Text style={{ fontWeight: "600" }}>Import combined plan</Text>.
+            If the list is empty, use <Text style={{ fontWeight: "600" }}>Pick DVH files</Text>.
           </Text>
+
+          <Pressable
+            onPress={handlePickDvhFiles}
+            disabled={loading}
+            accessibilityLabel="Pick DVH files"
+            style={{
+              backgroundColor: colors.primary,
+              borderRadius: 12,
+              paddingVertical: 14,
+              alignItems: "center",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "600" }}>Pick DVH files (PTV + OAR)</Text>
+          </Pressable>
 
           {loading && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -263,44 +363,42 @@ export default function DVHInputOfflineScreen() {
             </View>
           )}
 
-          <Pressable
-            onPress={handleBundledTest}
-            disabled={loading}
-            style={{
-              backgroundColor: colors.primary,
-              borderRadius: 12,
-              paddingVertical: 14,
-              alignItems: "center",
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "600" }}>
-              Test: parse bundled KASTOORI sample
-            </Text>
-          </Pressable>
-          <Text style={{ color: colors.muted, fontSize: 12, marginTop: -8 }}>
-            No file picker or Downloads — verifies parser only.
-          </Text>
-
-          <Pressable
-            onPress={handleLoadKastooriPair}
-            disabled={loading}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.primary,
-              borderRadius: 12,
-              paddingVertical: 12,
-              alignItems: "center",
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            <Text style={{ color: colors.primary, fontWeight: "600" }}>
-              Load Kastoori PTV + OAR from Downloads
-            </Text>
-          </Pressable>
-          <Text style={{ color: colors.muted, fontSize: 12, marginTop: -8 }}>
-            Requires both files in Download/rbgyanx_test/
-          </Text>
+          {showDeveloperTools() && (
+            <>
+              <Pressable
+                onPress={handleBundledTest}
+                disabled={loading}
+                style={{
+                  backgroundColor: colors.primary,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  opacity: loading ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "600" }}>
+                  Test: bundled sample (dev)
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleLoadKastooriPair}
+                disabled={loading}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.primary,
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  alignItems: "center",
+                  opacity: loading ? 0.6 : 1,
+                  marginTop: 8,
+                }}
+              >
+                <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                  Load test PTV + OAR pair (dev)
+                </Text>
+              </Pressable>
+            </>
+          )}
 
           <Text style={{ color: colors.foreground, fontWeight: "600", marginTop: 8 }}>
             Files in Downloads
@@ -318,9 +416,26 @@ export default function DVHInputOfflineScreen() {
           >
             <Text style={{ color: colors.primary, fontWeight: "600" }}>Refresh Downloads list</Text>
           </Pressable>
+          {downloadFiles.length >= 2 && (
+            <Pressable
+              onPress={handleMergeAllListed}
+              disabled={loading}
+              style={{
+                backgroundColor: colors.primary,
+                borderRadius: 12,
+                paddingVertical: 12,
+                alignItems: "center",
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "600" }}>
+                Import combined plan ({downloadFiles.length} files)
+              </Text>
+            </Pressable>
+          )}
           {downloadFiles.length === 0 && !loading && (
             <Text style={{ color: colors.muted, fontSize: 13 }}>
-              No .txt found. Copy Eclipse exports to Download or Download/rbgyanx_test.
+              No plan files found. Copy PTV and OAR .txt files to Downloads.
             </Text>
           )}
           {downloadFiles.map((f) => (

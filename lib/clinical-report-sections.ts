@@ -48,12 +48,22 @@ export function clinicalReportSiteLabel(siteId: string): string {
   return siteId;
 }
 
-export function clinicalReportDisclaimer(includeClinical: boolean): string {
+export function clinicalReportDisclaimer(
+  includeClinical: boolean,
+  covariatesApplied?: boolean,
+): string {
   if (!includeClinical) return "";
+  if (covariatesApplied) {
+    return (
+      "Clinical covariates were applied to TCP/NTCP using exploratory log-odds adjustment " +
+      "(age, sex, chemo, smoking, ECOG, organ-specific dose slopes). " +
+      "Base DVH-derived probabilities are shown in parentheses where adjusted values are displayed. " +
+      "Synthetic-flagged rows remain unsuitable for toxicity correlation."
+    );
+  }
   return (
-    "Clinical covariates below are optional documentation for MDT traceability. " +
-    "TCP/NTCP values in this report are computed from DVH and literature LQ parameters only " +
-    "(clinical presets do not adjust dose–response math unless a future opt-in model is enabled)."
+    "Optional clinical fields adjust TCP/NTCP when you enter them. " +
+    "Linked xlsx rows also adjust probabilities when “Apply covariates to TCP/NTCP” is enabled."
   );
 }
 

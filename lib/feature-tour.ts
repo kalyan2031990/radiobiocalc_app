@@ -7,6 +7,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { markFirstLaunchDone } from "@/lib/onboarding";
 import { DEMO_PATIENT_ID } from "@/lib/demo-constants";
 import { savePlanEvalSession } from "@/lib/plan-eval-session";
+import { saveDvhSession } from "@/lib/dvh-session";
+import type { ParsedDvhBundle } from "@/lib/dvh-bundle-types";
 import {
   inferEvaluationRole,
   literatureOrganForRole,
@@ -20,7 +22,6 @@ import { isOfflineBuild } from "@/lib/offline-mode";
 import { offlineEvaluateComposite, offlineParseDvh } from "@/lib/offline-engine";
 
 const DISCLAIMER_KEY = "@rbgyanx_disclaimer_accepted";
-const DEMO_DVH_CLIENT_ID = "demo_server";
 const TOTAL_DOSE = 70;
 const NUM_FRACTIONS = 35;
 
@@ -66,6 +67,7 @@ async function fetchDemoPlan(): Promise<{
   composite: CompositePlanEvaluation;
   planScope: string;
   therapeuticWindowEligible: boolean;
+  bundle: ParsedDvhBundle;
 }> {
   if (isOfflineBuild()) {
     const csv = `dose,volume,structure
@@ -92,6 +94,7 @@ async function fetchDemoPlan(): Promise<{
       composite,
       planScope: "multi_structure",
       therapeuticWindowEligible: true,
+      bundle,
     };
   }
 
@@ -104,7 +107,7 @@ async function fetchDemoPlan(): Promise<{
   if (!res.ok || !payload?.success) {
     throw new Error(payload?.error ?? `Demo plan HTTP ${res.status}`);
   }
-  return payload.data;
+  return { ...payload.data, bundle: payload.data.bundle as ParsedDvhBundle };
 }
 
 function buildResultsParams(ctx: {
@@ -170,6 +173,7 @@ export async function runFeatureTour(
       ? composite.structureResults
       : [];
     const planEvalSessionId = await savePlanEvalSession(composite);
+    const dvhSessionId = await saveDvhSession(data.bundle);
     const tw = composite.therapeutic;
     const summary = `TCP ${(tw.tcp * 100).toFixed(1)}% · NTCP ${(tw.ntcpComposite * 100).toFixed(1)}% · UTCP ${(tw.utcp * 100).toFixed(1)}% · TWI ${(tw.twi * 100).toFixed(1)}% (${tw.twiInterpretation})`;
     progress("load", "done", { summary });
@@ -185,7 +189,7 @@ export async function runFeatureTour(
       "PTV70new";
 
     const baseCtx = {
-      dvhSessionId: DEMO_DVH_CLIENT_ID,
+      dvhSessionId,
       serverDvhSessionId: data.serverDvhSessionId,
       fileName: data.fileName,
       planScope: data.planScope,
@@ -196,7 +200,7 @@ export async function runFeatureTour(
     router.push({
       pathname: "/calculation-setup",
       params: {
-        dvhSessionId: DEMO_DVH_CLIENT_ID,
+        dvhSessionId,
         serverDvhSessionId: data.serverDvhSessionId,
         fileName: data.fileName,
       },

@@ -1,5 +1,5 @@
 /**
- * Product information — version, intended use, roadmap, validation & help status.
+ * Product information — version, intended use, validation & help status.
  */
 
 import type { ReactNode } from "react";
@@ -11,19 +11,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { AppVersionBadge } from "@/components/app-version-badge";
 import { RbgyanxLogo } from "@/components/rbgyanx-logo";
 import { APP_TAGLINE, INTENDED_USE } from "@/lib/app-meta";
-import { MOBILE_FEATURE_ROADMAP, type RoadmapItemStatus } from "@/lib/feature-roadmap";
-
-function statusLabel(s: RoadmapItemStatus): string {
-  if (s === "shipped") return "Shipped";
-  if (s === "in_progress") return "In progress";
-  return "Planned";
-}
-
-function statusColor(s: RoadmapItemStatus, colors: ReturnType<typeof useColors>): string {
-  if (s === "shipped") return colors.success;
-  if (s === "in_progress") return colors.warning;
-  return colors.muted;
-}
+import { isClinicianMobileApk, showDeveloperTools } from "@/lib/clinician-build";
 
 export default function ProductInfoScreen() {
   const router = useRouter();
@@ -37,7 +25,7 @@ export default function ProductInfoScreen() {
             <View className="flex-row items-center gap-2">
               <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
               <Text className="text-lg font-semibold" style={{ color: colors.foreground }}>
-                Product & validation
+                {isClinicianMobileApk() ? "About rbGyanX" : "Product & validation"}
               </Text>
             </View>
           </Pressable>
@@ -50,18 +38,16 @@ export default function ProductInfoScreen() {
 
           <Section title="Clinical presets vs TCP/NTCP" colors={colors}>
             <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
-              Optional fields (age, BMI, HPV, smoking, concurrent chemo, etc.) support MDT
-              traceability and future multivariable adjustment (py_ntcpx-style). They do not
-              change dose–response math today — only DVH and literature LQ parameters do.
-              See docs/GAP_AUDIT.md.
+              Optional fields (age, chemo, smoking, etc.) support MDT documentation on this device.
+              They do not change dose–response math unless advanced covariate adjustment is enabled
+              on desktop rbGyanX.
             </Text>
           </Section>
 
           <Section title="DVH import" colors={colors}>
             <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
-              Import the same DVH export you would use for QUANTEC checks in Excel; future
-              releases may pull plans from your institution&apos;s planning server without manual
-              file transfer.
+              Copy PTV and OAR plan .txt files to your phone Downloads folder, then use
+              Import combined plan in the app.
             </Text>
           </Section>
 
@@ -74,41 +60,23 @@ export default function ProductInfoScreen() {
             </Text>
           </Section>
 
-          <Section title="Documentation" colors={colors}>
-            <Text className="text-sm" style={{ color: colors.warning }}>
-              {INTENDED_USE.helpDocStatus}
-            </Text>
-            <Text className="text-sm mt-2 leading-relaxed" style={{ color: colors.muted }}>
-              {INTENDED_USE.validationStatus}
-            </Text>
-            <Text className="text-xs mt-2" style={{ color: colors.muted }}>
-              Repository: docs/VALIDATION_AND_RELEASE.md · docs/USER_HELP.md (draft) ·
-              docs/BENCHMARK_CASES.md
-            </Text>
-          </Section>
-
-          <Section title="Feature roadmap (mobile)" colors={colors}>
-            <Text className="text-xs mb-2" style={{ color: colors.muted }}>
-              Updated with each release; more modules can be added over time.
-            </Text>
-            {MOBILE_FEATURE_ROADMAP.map((item) => (
-              <View key={item.id} className="flex-row gap-2 mb-2">
-                <Text style={{ color: statusColor(item.status, colors), fontSize: 11, width: 72 }}>
-                  {statusLabel(item.status)}
-                </Text>
-                <View className="flex-1">
-                  <Text className="text-sm" style={{ color: colors.foreground }}>
-                    {item.title}
+          {!isClinicianMobileApk() && (
+            <Section title="Documentation" colors={colors}>
+              <Text className="text-sm" style={{ color: colors.warning }}>
+                {INTENDED_USE.helpDocStatus}
+              </Text>
+              {showDeveloperTools() ? (
+                <>
+                  <Text className="text-sm mt-2 leading-relaxed" style={{ color: colors.muted }}>
+                    {INTENDED_USE.validationStatus}
                   </Text>
-                  {item.note ? (
-                    <Text className="text-xs" style={{ color: colors.muted }}>
-                      {item.note}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </Section>
+                  <Text className="text-xs mt-2" style={{ color: colors.muted }}>
+                    Repository: docs/VALIDATION_AND_RELEASE.md · docs/validation/
+                  </Text>
+                </>
+              ) : null}
+            </Section>
+          )}
 
           <Section title="Clinical disclaimer" colors={colors}>
             <View
@@ -129,12 +97,13 @@ export default function ProductInfoScreen() {
             </View>
           </Section>
 
-          <Section title="Framework" colors={colors}>
-            <Text className="text-sm" style={{ color: colors.muted }}>
-              React Native (Expo) · TypeScript · tRPC API · aligns with desktop rbGyanX Python
-              engine for cross-checks.
-            </Text>
-          </Section>
+          {!isClinicianMobileApk() && (
+            <Section title="Framework" colors={colors}>
+              <Text className="text-sm" style={{ color: colors.muted }}>
+                React Native (Expo) · TypeScript · aligns with desktop rbGyanX for cross-checks.
+              </Text>
+            </Section>
+          )}
         </View>
       </ScrollView>
     </ScreenContainer>

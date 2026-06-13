@@ -17,6 +17,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { DISCLAIMER_KEY, SELFTEST_LAST_KEY } from "@/lib/onboarding";
 import { runAppSelfTest, type SelfTestResult } from "@/lib/app-selftest";
 import { loadPilotApiOverride } from "@/lib/pilot-api-store";
+import { isClinicianMobileApk } from "@/lib/clinician-build";
 
 export function AppBootstrap() {
   const colors = useColors();
@@ -34,11 +35,15 @@ export function AppBootstrap() {
 
       ranRef.current = true;
       await loadPilotApiOverride();
-      setVisible(true);
       const selfTest = await runAppSelfTest();
-      setResult(selfTest);
       await AsyncStorage.setItem(SELFTEST_LAST_KEY, JSON.stringify(selfTest));
 
+      if (isClinicianMobileApk()) {
+        return;
+      }
+
+      setVisible(true);
+      setResult(selfTest);
       setTimeout(() => setVisible(false), selfTest.ok ? 1200 : 4000);
     };
 

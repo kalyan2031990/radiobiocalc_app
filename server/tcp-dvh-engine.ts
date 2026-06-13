@@ -147,20 +147,75 @@ export function computeNEffFromDvh(
   return { nEff: nEff * repop, sfWeighted, repop };
 }
 
-export function computePoissonTcpFromDvh(
-  dvhDiff: DVHPoint[],
+export function computeNEffFromCumulativeDvh(
+  cumulative: DVHPoint[],
   numFractions: number,
   site: TCPSiteParams,
   targetType: string,
-  lqMaxDpf: number
+  lqMaxDpf: number,
+): { nEff: number; sfWeighted: number; repop: number } {
+  const sorted = [...cumulative].sort((a, b) => a.dose - b.dose);
+  const v0 = sorted[0]?.volume ?? 0;
+  if (v0 <= 0) return { nEff: 0, sfWeighted: 0, repop: 1 };
+
+  const alpha = site.alphaGyInv;
+  const beta = site.betaGyInv2;
+  const n0 = n0ForTarget(site, targetType);
+
+  let meanIntegral = 0;
+  let nEff = 0;
+  let sfWeighted = 0;
+
+  for (let i = 1; i < sorted.length; i++) {
+    const shellVol = Math.max(0, sorted[i - 1].volume - sorted[i].volume);
+    if (shellVol <= 1e-9) continue;
+    const doseGy = sorted[i].dose;
+    const volFrac = shellVol / v0;
+    meanIntegral += ((sorted[i - 1].dose + sorted[i].dose) / 2) * shellVol;
+
+    const dpf = doseGy / Math.max(numFractions, 1);
+    const useUsc = dpf > lqMaxDpf;
+    let sfFrac = survivalFractionPerFx(
+      Math.min(dpf, useUsc ? lqMaxDpf : dpf),
+      alpha,
+      beta,
+    );
+    if (useUsc && dpf > lqMaxDpf) {
+      const sfCap = survivalFractionPerFx(lqMaxDpf, alpha, beta);
+      const extra = Math.exp(-alpha * (dpf - lqMaxDpf));
+      sfFrac = sfCap * extra;
+    }
+    const sfTotal = Math.pow(sfFrac, numFractions);
+    nEff += n0 * volFrac * sfTotal;
+    sfWeighted += volFrac * sfTotal;
+  }
+
+  const meanDose = meanIntegral / v0;
+  const dpfFallback = meanDose / Math.max(numFractions, 1);
+  const treatmentDays = treatmentTimeDays(numFractions, dpfFallback);
+  const repop = repopFactor(site, treatmentDays);
+
+  return { nEff: nEff * repop, sfWeighted, repop };
+}
+
+function isCumulativeDvh(dvh: DVHPoint[]): boolean {
+  if (dvh.length < 2) return false;
+  for (let i = 1; i < dvh.length; i++) {
+    if (dvh[i].volume > dvh[i - 1].volume + 1e-3) return false;
+  }
+  return true;
+}
+
+export function computePoissonTcpFromDvh(
+  dvh: DVHPoint[],
+  numFractions: number,
+  site: TCPSiteParams,
+  targetType: string,
+  lqMaxDpf: number,
 ): number {
-  const { nEff } = computeNEffFromDvh(
-    dvhDiff,
-    numFractions,
-    site,
-    targetType,
-    lqMaxDpf
-  );
+  const { nEff } = isCumulativeDvh(dvh)
+    ? computeNEffFromCumulativeDvh(dvh, numFractions, site, targetType, lqMaxDpf)
+    : computeNEffFromDvh(dvh, numFractions, site, targetType, lqMaxDpf);
   if (nEff <= 0 || !Number.isFinite(nEff)) return 0;
   return Math.max(0, Math.min(1, Math.exp(-nEff)));
 }

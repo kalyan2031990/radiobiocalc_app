@@ -27,6 +27,11 @@ export function getBuildLabel(): string {
   return __DEV__ ? "development" : "release";
 }
 
+/** Clinician-facing — version only (no build number). */
+export function getUserVersionLine(): string {
+  return `v${getAppVersion()}`;
+}
+
 export function getVersionLine(): string {
   return `v${getAppVersion()} (${getBuildLabel()})`;
 }
@@ -39,5 +44,5 @@ export const INTENDED_USE = {
     "Full cohort / DICOM pipeline with XAI: use desktop rbGyanX.",
   helpDocStatus: "User help guide: in preparation (not published yet).",
   validationStatus:
-    "Numerical validation in progress — see docs/VALIDATION_AND_RELEASE.md in the repository.",
+    "Numerical validation — see docs/VALIDATION_AND_RELEASE.md and docs/validation/.",
 } as const;

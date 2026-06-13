@@ -117,6 +117,7 @@ export function buildSingleStructureExplanation(
     limitations: [
       "Single structure view — not a full composite plan evaluation.",
       "TCP/NTCP use literature parameters; clinical covariates are documentation-only unless a future modifier layer is enabled.",
+      "Target TCP above 95% is capped for display (Poisson-LQ DVH model).",
       "Rule-based XAI (citation-linked narrative) — not PINN/ML attribution on mobile.",
     ],
     rbXScope:
@@ -203,6 +204,7 @@ export function buildPlanExplanation(
   const limitations = [
     "Single plan, single patient — no cohort training on device.",
     "TCP/NTCP use literature parameters; clinical factors (chemo, comorbidity) are not modeled.",
+    "HN composite TCP uses Poisson-LQ (DVH); values above 95% are capped for display.",
     "Conformity indices from target DVH approximate RTOG/Paddick when full isodose volumes are unavailable.",
   ];
 

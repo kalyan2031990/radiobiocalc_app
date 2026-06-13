@@ -9,6 +9,10 @@
  * Provides DVH extraction, validation, and processing
  */
 
+import {
+  isCompositeDvh,
+  parseCompositeDvhContent,
+} from "@/lib/composite-dvh-parse";
 import { inferStructureRole } from "./structure-role";
 import type { DVHPoint } from "./radiobiology";
 import { z } from "zod";
@@ -202,10 +206,45 @@ export function parseEclipseTxt(
  * - Dose, Volume, Structure (three columns)
  * - Header with metadata
  */
+export function parseCompositeDvh(
+  fileContent: string,
+  fileName: string = "composite_dvh.txt",
+): DVHData {
+  const parsed = parseCompositeDvhContent(fileContent, fileName);
+  const dvhByStructure: Record<string, DVHPoint[]> = {};
+  for (const [name, pts] of Object.entries(parsed.dvhByStructure)) {
+    const smoothed = enforceMonotonicCumulative(pts);
+    validateDVH(smoothed);
+    dvhByStructure[name] = smoothed;
+  }
+
+  return {
+    patientInfo: {
+      patientId: parsed.patientInfo.patientId,
+      patientName: parsed.patientInfo.patientName,
+      modality: parsed.patientInfo.modality,
+      ...(parsed.prescribedDoseGy !== undefined
+        ? { studyDate: `Rx${parsed.prescribedDoseGy.toFixed(1)}Gy` }
+        : {}),
+    },
+    structures: parsed.structures.map((s) => ({
+      name: s.name,
+      type: s.type,
+    })),
+    dvhByStructure,
+    isDifferential: false,
+    doseUnit: "Gy",
+    volumeUnit: "cm3",
+  };
+}
+
 export function parseCSVDVH(
   fileContent: string,
   fileName: string = "dvh.csv"
 ): DVHData {
+  if (isCompositeDvh(fileContent)) {
+    return parseCompositeDvh(fileContent, fileName);
+  }
   if (isEclipseTxt(fileContent)) {
     return parseEclipseTxt(fileContent, fileName);
   }

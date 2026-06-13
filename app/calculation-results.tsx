@@ -40,6 +40,17 @@ import { ParameterProvenancePanel } from "@/components/parameter-provenance-pane
 import { RbXExplanationPanel } from "@/components/rbx-explanation-panel";
 import { usesLocalEngine } from "@/lib/offline-mode";
 import { buildSingleStructureExplanation } from "@/lib/rbgyanx-explain";
+import { applyManuscriptCovariates } from "@/lib/manuscript-covariates";
+import { resolveClinicalForCovariates } from "@/lib/clinical-context-covariates";
+import type { ClinicalRecord } from "@/lib/clinical-xlsx-core";
+import { ClinicalDataPanelCompact } from "@/components/clinical-data-panel";
+import { clinicalDataStatusLabel } from "@/lib/clinical-data-service";
+import {
+  defaultCompositeNtcpModel,
+  defaultCompositeTcpModel,
+} from "@/lib/structure-role";
+import { TcpModelCaution } from "@/components/tcp-model-caution";
+import { capTcpForDisplay, formatTcpPercent } from "@/lib/tcp-display";
 
 interface DoseMetrics {
   meanDose: number;
@@ -62,6 +73,11 @@ interface DoseMetrics {
 interface CalculationResult {
   tcp?: number;
   ntcp?: number;
+  baseTcp?: number;
+  baseNtcp?: number;
+  covariatesApplied?: boolean;
+  clinicalSyntheticFlag?: boolean;
+  clinicalDataSource?: string;
   bed: number;
   eqd2: number;
   doseMetrics: DoseMetrics;
@@ -102,6 +118,16 @@ export default function CalculationResultsScreen() {
   const cancerSite = (params.cancerSite as string) || "HN";
   const technique = (params.technique as string) || "IMRT";
   const targetType = (params.targetType as string) || "PTV";
+  const applyClinicalCovariates = params.applyClinicalCovariates === "1";
+  const clinicalRecord = useMemo((): ClinicalRecord | null => {
+    const raw = params.clinicalRecordJSON as string;
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as ClinicalRecord;
+    } catch {
+      return null;
+    }
+  }, [params.clinicalRecordJSON]);
   const clinicalContext = useMemo(
     () => parseClinicalContext(params.clinicalJSON as string),
     [params.clinicalJSON],
@@ -244,9 +270,45 @@ export default function CalculationResultsScreen() {
         }
         data = response.data;
       }
+
+      let tcp = data.tcp;
+      let ntcp = data.ntcp;
+      let covariatesApplied = false;
+      const cov = resolveClinicalForCovariates({
+        ctx: clinicalContext,
+        xlsxRecord: clinicalRecord,
+        patientId,
+        organ,
+        isTarget: structureType === "target",
+        totalDoseGy: totalDose,
+        fractions: numFractions,
+        toggleOn: applyClinicalCovariates,
+      });
+      if (cov.apply && cov.record) {
+        const adj = applyManuscriptCovariates(
+          data.tcp,
+          data.ntcp,
+          cov.record,
+          organ,
+        );
+        if (structureType === "target" && adj.adjustedTcp != null && data.tcp != null) {
+          tcp = adj.adjustedTcp;
+          covariatesApplied = adj.factorsApplied.length > 0;
+        }
+        if (structureType === "oar" && adj.adjustedNtcp != null && data.ntcp != null) {
+          ntcp = adj.adjustedNtcp;
+          covariatesApplied = adj.factorsApplied.length > 0;
+        }
+      }
+
       setResult({
-        tcp: data.tcp,
-        ntcp: data.ntcp,
+        tcp,
+        ntcp,
+        baseTcp: data.tcp,
+        baseNtcp: data.ntcp,
+        covariatesApplied,
+        clinicalSyntheticFlag: clinicalRecord?.syntheticFlag,
+        clinicalDataSource: clinicalRecord?.dataSource,
         bed: data.bed,
         eqd2: data.eqd2,
         doseMetrics: data.doseMetrics as DoseMetrics,
@@ -296,6 +358,7 @@ export default function CalculationResultsScreen() {
   }
 
   const isTarget = structureType === "target";
+  const tcpShown = result.tcp != null ? capTcpForDisplay(result.tcp) : null;
 
   return (
     <ScreenContainer className="bg-background">
@@ -330,6 +393,23 @@ export default function CalculationResultsScreen() {
             <Text className="text-sm text-muted" style={{ color: colors.muted }}>
               {structureName} ({structureType === "target" ? "Target" : "OAR"}) · {technique} · {result.model}
             </Text>
+            {clinicalRecord ? (
+              <ClinicalDataPanelCompact
+                applyCovariates={!!result.covariatesApplied}
+                syntheticFlag={!!result.clinicalSyntheticFlag}
+                dataSource={clinicalDataStatusLabel(clinicalRecord)}
+              />
+            ) : null}
+            {result.covariatesApplied && result.baseTcp != null && result.tcp != null ? (
+              <Text className="text-xs" style={{ color: colors.muted }}>
+                TCP base {formatTcpPercent(result.baseTcp)} → adjusted {formatTcpPercent(result.tcp)}
+              </Text>
+            ) : null}
+            {result.covariatesApplied && result.baseNtcp != null && result.ntcp != null ? (
+              <Text className="text-xs" style={{ color: colors.muted }}>
+                NTCP base {(result.baseNtcp * 100).toFixed(1)}% → adjusted {(result.ntcp * 100).toFixed(1)}%
+              </Text>
+            ) : null}
             {result.lqCaution && (
               <Text className="text-xs" style={{ color: colors.warning }}>
                 LQ caution: high dose per fraction — review BED/EQD2 for {technique}.
@@ -342,7 +422,7 @@ export default function CalculationResultsScreen() {
             className="rounded-2xl p-6 gap-4"
             style={{ backgroundColor: colors.surface }}
           >
-            {structureType === "target" && result.tcp != null ? (
+            {structureType === "target" && result.tcp != null && tcpShown ? (
               <>
                 <View className="items-center gap-2">
                   <Text
@@ -355,7 +435,7 @@ export default function CalculationResultsScreen() {
                     className="text-5xl font-bold"
                     style={{ color: colors.primary }}
                   >
-                    {(result.tcp! * 100).toFixed(1)}%
+                    {formatTcpPercent(result.tcp!)}
                   </Text>
                 </View>
 
@@ -364,26 +444,26 @@ export default function CalculationResultsScreen() {
                   className="rounded-lg p-3 flex-row items-center gap-2"
                   style={{
                     backgroundColor:
-                      result.tcp! > 0.9
+                      tcpShown.display > 0.9
                         ? colors.success + "20"
-                        : result.tcp! > 0.7
+                        : tcpShown.display > 0.7
                         ? colors.warning + "20"
                         : colors.error + "20",
                   }}
                 >
                   <MaterialIcons
                     name={
-                      result.tcp! > 0.9
+                      tcpShown.display > 0.9
                         ? "check-circle"
-                        : result.tcp! > 0.7
+                        : tcpShown.display > 0.7
                         ? "warning"
                         : "error"
                     }
                     size={20}
                     color={
-                      result.tcp! > 0.9
+                      tcpShown.display > 0.9
                         ? colors.success
-                        : result.tcp! > 0.7
+                        : tcpShown.display > 0.7
                         ? colors.warning
                         : colors.error
                     }
@@ -392,20 +472,22 @@ export default function CalculationResultsScreen() {
                     className="text-sm font-medium"
                     style={{
                       color:
-                        result.tcp! > 0.9
+                        tcpShown.display > 0.9
                           ? colors.success
-                          : result.tcp! > 0.7
+                          : tcpShown.display > 0.7
                           ? colors.warning
                           : colors.error,
                     }}
                   >
-                    {result.tcp! > 0.9
-                      ? "Excellent tumor control"
-                      : result.tcp! > 0.7
-                      ? "Good tumor control"
-                      : "Low tumor control"}
+                    {tcpShown.display > 0.9
+                      ? "Excellent tumor control (model)"
+                      : tcpShown.display > 0.7
+                      ? "Good tumor control (model)"
+                      : "Low tumor control (model)"}
                   </Text>
                 </View>
+
+                <TcpModelCaution showCapFootnote={tcpShown.capped} compact />
               </>
             ) : (
               <>
@@ -737,8 +819,16 @@ export default function CalculationResultsScreen() {
                 ))
               )}
               <Text className="text-xs italic pt-2" style={{ color: colors.muted }}>
-                For MDT traceability only — not used in TCP/NTCP calculation on mobile.
+                {result.covariatesApplied
+                  ? "Clinical covariates were applied to TCP/NTCP from linked xlsx and/or fields you entered in Clinical context."
+                  : "Enter clinical context fields or link xlsx data to adjust TCP/NTCP; toggle “Apply covariates” for xlsx-only adjustment."}
               </Text>
+              {clinicalRecord ? (
+                <Text className="text-xs" style={{ color: colors.muted }}>
+                  Source: {clinicalDataStatusLabel(clinicalRecord)}
+                  {clinicalRecord.syntheticFlag ? " · synthetic-flagged" : ""}
+                </Text>
+              ) : null}
             </View>
           )}
 
@@ -806,13 +896,23 @@ export default function CalculationResultsScreen() {
                   technique,
                   totalDose: String(totalDose),
                   numFractions: String(numFractions),
+                  ...(dvhSessionId ? { dvhSessionId } : {}),
                   tcp: result.tcp != null ? String(result.tcp) : "",
                   ntcp: result.ntcp != null ? String(result.ntcp) : "",
+                  baseTcp: result.baseTcp != null ? String(result.baseTcp) : "",
+                  baseNtcp: result.baseNtcp != null ? String(result.baseNtcp) : "",
+                  applyClinicalCovariates: result.covariatesApplied ? "1" : "0",
+                  clinicalDataNote: clinicalRecord
+                    ? `${clinicalRecord.dataSource}${clinicalRecord.syntheticFlag ? " (synthetic-flagged)" : ""}`
+                    : "",
                   bed: String(result.bed),
                   eqd2: String(result.eqd2),
                   meanDose: String(result.doseMetrics.meanDose),
                   maxDose: String(result.doseMetrics.maxDose),
                   gEUD: String(result.doseMetrics.gEUD ?? result.doseMetrics.meanDose),
+                  td50: String(result.parameters?.td50 ?? result.parameters?.d50 ?? 28),
+                  gamma50: String(result.parameters?.gamma50 ?? result.parameters?.gamma ?? 1),
+                  chartDose: String(result.doseMetrics.gEUD ?? result.doseMetrics.meanDose),
                   doseMetricsJSON: JSON.stringify(guidelineMetrics),
                   clinicalJSON: (params.clinicalJSON as string) || "",
                   includeClinicalInReport:
@@ -921,8 +1021,18 @@ export default function CalculationResultsScreen() {
                       cancerSite,
                       technique,
                       prescriptionGy: totalDose,
-                      tcpModel: "lkb_loglogit",
-                      ntcpModel: "lkb_loglogit",
+                      tcpModel: defaultCompositeTcpModel(cancerSite) as
+                        | "lkb_loglogit"
+                        | "lkb_probit"
+                        | "poisson"
+                        | "zaider_minerbo"
+                        | "poisson_dvh",
+                      ntcpModel: defaultCompositeNtcpModel() as
+                        | "lkb_loglogit"
+                        | "lkb_probit"
+                        | "poisson"
+                        | "zaider_minerbo"
+                        | "poisson_dvh",
                     });
                     if (!evalRes.success || !evalRes.data) {
                       Alert.alert(

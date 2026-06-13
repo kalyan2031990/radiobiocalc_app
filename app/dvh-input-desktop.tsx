@@ -75,10 +75,24 @@ export default function DVHInputDesktopScreen() {
       setDVHData(data);
       const stats = summarizeDvhBundle(data);
       const scope = analyzePlanScope(data);
+      const clientSessionId = await saveDvhSession(data);
+      const label =
+        assets.length === 1
+          ? assets[0]!.name
+          : `${assets.length} files: ${fileNames.join(", ")}`;
+      setSelectedFile({ name: label });
+      router.push({
+        pathname: "/calculation-setup",
+        params: {
+          dvhSessionId: clientSessionId,
+          fileName: label,
+        },
+      });
       Alert.alert(
         "DVH loaded",
         `${stats.structureCount} structure(s), ${stats.pointCount} points` +
-          (scope.therapeuticWindowEligible ? " · composite plan (target + OAR)" : ""),
+          (scope.therapeuticWindowEligible ? " · composite plan (target + OAR)" : "") +
+          "\n\nOpening plan setup…",
       );
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";

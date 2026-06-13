@@ -10,7 +10,7 @@
 
 import type { DVHPoint } from "./radiobiology";
 import type { TCPSiteParams } from "./tcp-site-params";
-import { computeNEffFromDvh } from "./tcp-dvh-engine";
+import { computeNEffFromDvh, computeNEffFromCumulativeDvh } from "./tcp-dvh-engine";
 
 export interface ZMResult {
   tcp: number;
@@ -54,13 +54,11 @@ export function computeZaiderMinerboTcp(
   const mu = b * deadFraction;
   const p0 = p0SingleCellExtinction(tObsDays, b, mu);
 
-  const { nEff, repop } = computeNEffFromDvh(
-    dvhDiff,
-    numFractions,
-    site,
-    targetType,
-    lqMaxDpf
-  );
+  const cumulative =
+    dvhDiff.length >= 2 && dvhDiff[0].volume >= dvhDiff[dvhDiff.length - 1].volume - 1e-6;
+  const { nEff, repop } = cumulative
+    ? computeNEffFromCumulativeDvh(dvhDiff, numFractions, site, targetType, lqMaxDpf)
+    : computeNEffFromDvh(dvhDiff, numFractions, site, targetType, lqMaxDpf);
 
   let tcp = 0;
   if (nEff > 0 && Number.isFinite(nEff) && Number.isFinite(p0)) {

@@ -44,6 +44,19 @@ export function literatureOrganForRole(
   return mapToLiteratureOrgan(structureName, fileHint);
 }
 
-export function defaultModelForRole(role: "target" | "oar"): string {
-  return role === "target" ? "zaider_minerbo" : "lkb_loglogit";
+/** Default TCP model for composite / target evaluation (site-aware). */
+export function defaultCompositeTcpModel(cancerSite = "HN"): string {
+  const id = cancerSite.toUpperCase().replace(/[\s&_./-]/g, "");
+  if (id === "HN" || id === "HEADANDNECK" || id === "HEADNECK") {
+    return "poisson_dvh";
+  }
+  return "zaider_minerbo";
+}
+
+export function defaultCompositeNtcpModel(): string {
+  return "lkb_loglogit";
+}
+
+export function defaultModelForRole(role: "target" | "oar", cancerSite = "HN"): string {
+  return role === "target" ? defaultCompositeTcpModel(cancerSite) : defaultCompositeNtcpModel();
 }

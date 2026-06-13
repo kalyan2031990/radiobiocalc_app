@@ -1,17 +1,13 @@
 /**
- * Optional clinical covariates — presets today; multivariable adjustment (py_ntcpx-style) later.
- *
- * Current TCP/NTCP formulas do NOT consume ClinicalContext. Values are stored for
- * reports, MDT traceability, and future regression layers.
+ * Optional clinical covariates — user context and xlsx rows adjust TCP/NTCP when provided.
  */
 
 import type { ClinicalContext } from "@/lib/clinical-context";
+import { clinicalContextHasValues } from "@/lib/clinical-fields-schema";
 import type { CancerSiteId } from "@/server/sites-registry";
 
 export type ClinicalModifierPlan = {
-  /** When false, only DVH + literature LQ parameters drive TCP/NTCP */
-  appliesToCalculation: false;
-  /** Factors a future MV model could ingest (aligned with common HN / thoracic literature) */
+  appliesToCalculation: boolean;
   plannedFactors: readonly string[];
   summary: string;
 };
@@ -31,17 +27,16 @@ const PLANNED_FACTORS = [
   "stage_m",
 ] as const;
 
-/**
- * Describe how clinical presets relate to calculation (honest gap vs py_ntcpx MV regression).
- */
 export function clinicalModifierPlan(
   _site: CancerSiteId | string,
-  _ctx: ClinicalContext,
+  ctx: ClinicalContext,
 ): ClinicalModifierPlan {
+  const applies = clinicalContextHasValues(ctx);
   return {
-    appliesToCalculation: false,
+    appliesToCalculation: applies,
     plannedFactors: PLANNED_FACTORS,
-    summary:
-      "Clinical presets are optional documentation only (included in PDF/DOCX when opted in). TCP/NTCP use DVH + QUANTEC/RTOG literature parameters. Planned: site-specific multivariable adjustment (e.g. HPV, chemo, age for HN TCP) as an explicit opt-in layer — not silent defaults.",
+    summary: applies
+      ? "Clinical context fields you entered adjust TCP/NTCP via exploratory log-odds covariates (age, sex, chemo, smoking, KPS/ECOG)."
+      : "Optional clinical fields adjust TCP/NTCP when filled, or when xlsx clinical data is linked with covariates enabled.",
   };
 }

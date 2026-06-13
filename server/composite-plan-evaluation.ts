@@ -20,6 +20,10 @@ import {
   type OarNtcpEntry,
 } from "../lib/therapeutic-window";
 import { resolveCancerSite } from "../lib/infer-cancer-site";
+import {
+  defaultCompositeNtcpModel,
+  defaultCompositeTcpModel,
+} from "../lib/structure-role";
 
 export type StructureEvalResult = {
   structureName: string;
@@ -109,15 +113,15 @@ export function evaluateCompositePlan(
     structureNames,
     options.fileHint ?? data.patientInfo?.patientName ?? "",
   );
+  const cancerSite = options.cancerSite ?? resolvedSite;
   const {
     totalDose,
     numFractions,
-    cancerSite = resolvedSite,
     technique = "IMRT",
     prescriptionGy = totalDose,
     fileHint = data.patientInfo?.patientName ?? "",
-    tcpModel = "lkb_loglogit",
-    ntcpModel = "lkb_loglogit",
+    tcpModel = defaultCompositeTcpModel(cancerSite),
+    ntcpModel = defaultCompositeNtcpModel(),
   } = options;
 
   const structureResults: StructureEvalResult[] = [];

@@ -16,7 +16,7 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import {
   structureKeys,
@@ -31,9 +31,15 @@ import {
 } from "@/lib/structure-role";
 import { analyzePlanScope } from "@/lib/plan-scope";
 import { inferCancerSiteFromStructureNames } from "@/lib/infer-cancer-site";
-import { getVersionLine } from "@/lib/app-meta";
+import { getUserVersionLine, getVersionLine } from "@/lib/app-meta";
+import { isClinicianMobileApk } from "@/lib/clinician-build";
+import { formatImportedPlanLabel } from "@/lib/user-facing-labels";
 import { ClinicalContextForm } from "@/components/clinical-context-form";
+import { ClinicalDataPanel } from "@/components/clinical-data-panel";
 import { EMPTY_CLINICAL, type ClinicalContext } from "@/lib/clinical-context";
+import type { ClinicalRecord } from "@/lib/clinical-xlsx-core";
+import { extractPatientIdFromDvh } from "@/lib/clinical-record-map";
+import type { ClinicalDataSettings } from "@/lib/clinical-data-service";
 
 type ModelId =
   | "lkb_loglogit"
@@ -96,10 +102,14 @@ export default function CalculationSetupOfflineScreen() {
   const [planLabel, setPlanLabel] = useState("Plan 1");
   const [clinical, setClinical] = useState<ClinicalContext>({ ...EMPTY_CLINICAL });
   const [includeClinicalInReport, setIncludeClinicalInReport] = useState(true);
+  const [clinicalRecord, setClinicalRecord] = useState<ClinicalRecord | null>(null);
+  const [clinicalSettings, setClinicalSettings] = useState<ClinicalDataSettings | null>(null);
   const [selectedStructure, setSelectedStructure] = useState("");
   const [structureType, setStructureType] = useState<"target" | "oar">("oar");
   const [selectedOrgan, setSelectedOrgan] = useState("Parotid");
-  const [selectedModel, setSelectedModel] = useState<ModelId>("lkb_loglogit");
+  const [selectedModel, setSelectedModel] = useState<ModelId>(
+    defaultModelForRole("oar", "HN") as ModelId,
+  );
   const [targetType, setTargetType] = useState("PTV");
   const [totalDose, setTotalDose] = useState("70");
   const [numFractions, setNumFractions] = useState("35");
@@ -116,6 +126,30 @@ export default function CalculationSetupOfflineScreen() {
   );
 
   const planMeta = useMemo(() => analyzePlanScope(dvhBundle), [dvhBundle]);
+
+  const resolvedPatientId = useMemo(() => {
+    const fromField = patientId.trim();
+    if (fromField && fromField !== "—") return fromField;
+    return extractPatientIdFromDvh(dvhBundle?.patientInfo?.patientId, importedFileName);
+  }, [patientId, dvhBundle, importedFileName]);
+
+  const handleClinicalPrefill = useCallback((ctx: ClinicalContext, record: ClinicalRecord) => {
+    setClinicalRecord(record);
+    setClinical((prev) => ({ ...prev, ...ctx }));
+    if (!record.syntheticFlag && record.totalDoseGy > 0) {
+      setTotalDose(String(record.totalDoseGy));
+      setNumFractions(String(record.fractions));
+    }
+    if (record.technique) {
+      const t = record.technique.toUpperCase();
+      if (t.includes("VMAT")) setTechnique("VMAT");
+      else if (t.includes("IMRT")) setTechnique("IMRT");
+    }
+  }, []);
+
+  const handleClinicalSettingsChange = useCallback((s: ClinicalDataSettings) => {
+    setClinicalSettings(s);
+  }, []);
 
   const modelOptions = useMemo(
     () => modelOptionsForRole(structureType),
@@ -160,7 +194,7 @@ export default function CalculationSetupOfflineScreen() {
     const meta = dvhBundle.structures?.find((s) => s.name === first);
     const role = inferEvaluationRole(first, importedFileName, meta?.type);
     setStructureType(role);
-    setSelectedModel(defaultModelForRole(role) as ModelId);
+    setSelectedModel(defaultModelForRole(role, cancerSite) as ModelId);
     const lit =
       literatureOrganForRole(first, importedFileName) ??
       mapToLiteratureOrgan(first, importedFileName);
@@ -174,7 +208,7 @@ export default function CalculationSetupOfflineScreen() {
     const meta = dvhBundle?.structures?.find((s) => s.name === name);
     const role = inferEvaluationRole(name, importedFileName, meta?.type);
     setStructureType(role);
-    setSelectedModel(defaultModelForRole(role) as ModelId);
+    setSelectedModel(defaultModelForRole(role, cancerSite) as ModelId);
     const lit =
       literatureOrganForRole(name, importedFileName) ??
       mapToLiteratureOrgan(name, importedFileName);
@@ -218,6 +252,8 @@ export default function CalculationSetupOfflineScreen() {
         geudExponent: "1",
         clinicalJSON: JSON.stringify(clinical),
         includeClinicalInReport: includeClinicalInReport ? "1" : "0",
+        applyClinicalCovariates: clinicalSettings?.applyCovariatesToCalculation ? "1" : "0",
+        clinicalRecordJSON: clinicalRecord ? JSON.stringify(clinicalRecord) : "",
       },
     });
   };
@@ -259,7 +295,9 @@ export default function CalculationSetupOfflineScreen() {
         <Pressable onPress={() => router.back()}>
           <Text style={{ color: colors.primary, fontWeight: "600" }}>Back</Text>
         </Pressable>
-        <Text style={{ color: colors.muted, fontSize: 12 }}>{getVersionLine()}</Text>
+        <Text style={{ color: colors.muted, fontSize: 12 }}>
+          {isClinicianMobileApk() ? getUserVersionLine() : getVersionLine()}
+        </Text>
         <Text style={{ fontSize: 20, fontWeight: "700", color: colors.foreground }}>
           Plan evaluation setup
         </Text>
@@ -272,7 +310,7 @@ export default function CalculationSetupOfflineScreen() {
         ) : (
           <Text style={{ color: colors.muted }}>
             {fileStructures.length} structure(s) loaded
-            {importedFileName ? ` · ${importedFileName}` : ""}
+            {importedFileName ? ` · ${formatImportedPlanLabel(importedFileName)}` : ""}
           </Text>
         )}
 
@@ -296,9 +334,14 @@ export default function CalculationSetupOfflineScreen() {
               ? "Therapeutic window available — target + OAR detected in this DVH set."
               : "Therapeutic window needs target + OAR — import both PTV and OAR .txt files (multi-select)."}
           </Text>
-          {!planMeta.therapeuticWindowEligible && (
+          {!planMeta.therapeuticWindowEligible && !isClinicianMobileApk() && (
             <Text style={{ fontSize: 11, color: "#B45309", marginTop: 6 }}>
               Example: KASTOORI_PTV70.txt + KASTOORI_COM_PRTD.txt together.
+            </Text>
+          )}
+          {!planMeta.therapeuticWindowEligible && isClinicianMobileApk() && (
+            <Text style={{ fontSize: 11, color: "#B45309", marginTop: 6 }}>
+              Import both PTV and OAR .txt files together from Downloads.
             </Text>
           )}
         </View>
@@ -402,7 +445,7 @@ export default function CalculationSetupOfflineScreen() {
               key={role}
               onPress={() => {
                 setStructureType(role);
-                setSelectedModel(defaultModelForRole(role) as ModelId);
+                setSelectedModel(defaultModelForRole(role, cancerSite) as ModelId);
               }}
               style={{
                 paddingHorizontal: 12,
@@ -504,6 +547,17 @@ export default function CalculationSetupOfflineScreen() {
           style={inputStyle}
         />
 
+        {!isClinicianMobileApk() && (
+          <ClinicalDataPanel
+            colors={colors}
+            patientId={resolvedPatientId}
+            organKey={selectedOrgan}
+            isTarget={structureType === "target"}
+            onClinicalPrefill={handleClinicalPrefill}
+            onSettingsChange={handleClinicalSettingsChange}
+          />
+        )}
+
         <ClinicalContextForm
           value={clinical}
           onChange={setClinical}
@@ -530,8 +584,8 @@ export default function CalculationSetupOfflineScreen() {
               Include clinical context in PDF/DOCX
             </Text>
             <Text style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>
-              Site-specific presets (HPV, chemo, smoking, age, BMI, etc.) — documented in report
-              only; does not change TCP/NTCP.
+              Site-specific presets (HPV, chemo, smoking, age, BMI, etc.) — documented in report;
+              optionally adjusts TCP/NTCP when covariate toggle is ON above.
             </Text>
           </View>
           <Switch

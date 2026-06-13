@@ -22,6 +22,10 @@ import { getTcpSiteParams } from "./tcp-site-params";
 import { getTechnique } from "./techniques";
 import { computeExtendedPhysicalMetrics } from "./tcp-dvh-engine";
 import {
+  cumulativeDosePercentile,
+  volumePercentAtLeast,
+} from "../lib/plan-dosimetric-indices";
+import {
   computePoissonTcpFromDvh,
 } from "./tcp-dvh-engine";
 import { computeZaiderMinerboTcp } from "./zaider-minerbo";
@@ -567,28 +571,106 @@ function cumulativeNormalDistribution(x: number): number {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Cumulative Eclipse DVH → differential bins for EUD/gEUD/mean dose. */
-function toDifferentialDVH(dvh: DVHPoint[]): DVHPoint[] {
-  if (dvh.length < 2) return dvh;
-  let cumulative = true;
+export function isCumulativeDvh(dvh: DVHPoint[]): boolean {
+  if (dvh.length < 2) return false;
   for (let i = 1; i < dvh.length; i++) {
     if (dvh[i].volume > dvh[i - 1].volume + 1e-3) {
-      cumulative = false;
-      break;
+      return false;
     }
   }
-  if (!cumulative) return dvh;
+  return true;
+}
 
-  const diff: DVHPoint[] = [];
-  for (let i = 0; i < dvh.length; i++) {
-    const vol =
-      i === 0
-        ? dvh[i].volume
-        : Math.max(0, dvh[i - 1].volume - dvh[i].volume);
+/** Shell volumes from a cumulative DVH (dose = minimum dose to each shell). */
+export function cumulativeShellsFromDvh(cumulative: DVHPoint[]): DVHPoint[] {
+  const sorted = [...cumulative].sort((a, b) => a.dose - b.dose);
+  const shells: DVHPoint[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const vol = Math.max(0, sorted[i - 1].volume - sorted[i].volume);
     if (vol > 1e-9) {
-      diff.push({ dose: dvh[i].dose, volume: vol });
+      shells.push({ dose: sorted[i].dose, volume: vol });
     }
   }
-  return diff.length > 0 ? diff : dvh;
+  return shells.length > 0 ? shells : sorted;
+}
+
+/** Dose metrics from cumulative DVH (correct mean dose on uniform dose resamples). */
+export function calculateDoseMetricsFromCumulative(cumulative: DVHPoint[]): DoseMetrics {
+  const empty: DoseMetrics = {
+    meanDose: NaN,
+    maxDose: NaN,
+    minDose: NaN,
+    totalVolume: 0,
+    gEUD: NaN,
+    eud: NaN,
+    vxx: {},
+    dxx: {},
+  };
+  if (cumulative.length === 0) return empty;
+
+  const sorted = [...cumulative].sort((a, b) => a.dose - b.dose);
+  const v0 = sorted[0].volume;
+  if (v0 <= 0) return empty;
+
+  const shells = cumulativeShellsFromDvh(sorted);
+  let meanIntegral = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    const dv = Math.max(0, sorted[i - 1].volume - sorted[i].volume);
+    meanIntegral += ((sorted[i - 1].dose + sorted[i].dose) / 2) * dv;
+  }
+  const meanDose = meanIntegral / v0;
+  const maxDose = sorted[sorted.length - 1].dose;
+  const positiveDoses = sorted.map((p) => p.dose).filter((d) => d > 0);
+  const minDose = positiveDoses.length > 0 ? arrayMin(positiveDoses, maxDose) : maxDose;
+
+  const gEUD = calculateGEUD(shells, 1);
+  const eud = calculateEUD(meanDose, v0, 0.1);
+  const d98 = cumulativeDosePercentile(sorted, 98);
+  const d95 = cumulativeDosePercentile(sorted, 95);
+  const d50 = cumulativeDosePercentile(sorted, 50);
+  const d2 = cumulativeDosePercentile(sorted, 2);
+
+  const vxx: Record<number, number> = {};
+  for (let doseLevel = 5; doseLevel <= 70; doseLevel += 5) {
+    if (doseLevel <= maxDose) {
+      vxx[doseLevel] = volumePercentAtLeast(sorted, doseLevel);
+    } else {
+      vxx[doseLevel] = 0;
+    }
+  }
+
+  const dxx: Record<number, number> = {
+    2: d2,
+    5: cumulativeDosePercentile(sorted, 5),
+    50: d50,
+    95: d95,
+    98: d98,
+  };
+
+  return {
+    meanDose,
+    maxDose,
+    minDose,
+    totalVolume: v0,
+    gEUD,
+    eud,
+    vxx,
+    dxx,
+    d95,
+    d98,
+    d50,
+    d2,
+    v95: volumePercentAtLeast(sorted, maxDose * 0.95),
+    v100: volumePercentAtLeast(sorted, maxDose),
+    v107: volumePercentAtLeast(sorted, maxDose * 1.07),
+  };
+}
+
+function toDifferentialDVH(dvh: DVHPoint[]): DVHPoint[] {
+  if (dvh.length < 2) return dvh;
+  if (!isCumulativeDvh(dvh)) return dvh;
+
+  return cumulativeShellsFromDvh(dvh);
 }
 
 /**
@@ -602,6 +684,7 @@ export function performCalculation(
   const params = { ...defaultParameters, ...request.parameters };
 
   const dvhDiff = toDifferentialDVH(request.dvh);
+  const cumulative = isCumulativeDvh(request.dvh);
 
   if (dvhDiff.length === 0) {
     return {
@@ -626,7 +709,19 @@ export function performCalculation(
     : dvhDiff;
 
   // Calculate dose metrics (physical DVH for reporting)
-  const doseMetrics = calculateDoseMetrics(dvhDiff);
+  let doseMetrics = cumulative
+    ? calculateDoseMetricsFromCumulative(request.dvh)
+    : calculateDoseMetrics(dvhDiff);
+  if (cumulative && request.structureType === "target") {
+    const sorted = [...request.dvh].sort((a, b) => a.dose - b.dose);
+    const rx = request.totalDose;
+    doseMetrics = {
+      ...doseMetrics,
+      v95: volumePercentAtLeast(sorted, rx * 0.95),
+      v100: volumePercentAtLeast(sorted, rx),
+      v107: volumePercentAtLeast(sorted, rx * 1.07),
+    };
+  }
   if (!Number.isFinite(doseMetrics.gEUD) || doseMetrics.totalVolume <= 0) {
     return {
       organ: request.organ,
@@ -675,7 +770,7 @@ export function performCalculation(
     const targetType = request.targetType ?? "PTV";
     if (request.model === "zaider_minerbo" && siteParams) {
       const zm = computeZaiderMinerboTcp(
-        dvhDiff,
+        cumulative ? request.dvh : dvhDiff,
         request.numFractions,
         siteParams,
         targetType,
@@ -689,7 +784,7 @@ export function performCalculation(
       };
     } else if (request.model === "poisson_dvh" && siteParams) {
       tcp = computePoissonTcpFromDvh(
-        dvhDiff,
+        cumulative ? request.dvh : dvhDiff,
         request.numFractions,
         siteParams,
         targetType,

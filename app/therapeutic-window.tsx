@@ -9,9 +9,11 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { MaterialIcons } from "@expo/vector-icons";
 import { TherapeuticWindowChart } from "@/components/therapeutic-window-chart";
+import { TcpModelCaution } from "@/components/tcp-model-caution";
 import { useEffect, useState } from "react";
 import { loadPlanEvalSession } from "@/lib/plan-eval-session";
 import type { CompositePlanEvaluation } from "@/lib/composite-plan-types";
+import { capTcpForDisplay, formatTcpPercent } from "@/lib/tcp-display";
 
 function pct(v: number): string {
   return `${(v * 100).toFixed(1)}%`;
@@ -39,10 +41,15 @@ export default function TherapeuticWindowScreen() {
 
   const tw = evalData?.therapeutic;
   const dose = evalData?.totalDose ?? parseFloat((params.totalDose as string) || "70");
-  const tcp = tw?.tcp ?? parseFloat((params.tcp as string) || "0");
+  const tcp = tw?.tcp ?? capTcpForDisplay(parseFloat((params.tcp as string) || "0")).display;
   const ntcp =
     tw?.ntcpComposite ?? parseFloat((params.ntcp as string) || "0");
   const idx = evalData?.targetIndices;
+  const showTcpCaution =
+    tw?.tcpCapped ||
+    evalData?.structureResults.some(
+      (s) => s.structureType === "target" && (s.tcp ?? 0) > 0.95,
+    );
 
   if (loading) {
     return (
@@ -79,12 +86,20 @@ export default function TherapeuticWindowScreen() {
             <TherapeuticWindowChart tcp={tcp} ntcp={ntcp} dose={dose} />
           </View>
 
+          {(tw || showTcpCaution) && (
+            <TcpModelCaution showCapFootnote={!!tw?.tcpCapped} />
+          )}
+
           {tw && (
             <View className="rounded-lg p-4 gap-3" style={{ backgroundColor: colors.surface }}>
               <Text className="font-semibold" style={{ color: colors.foreground }}>
                 Plan-level metrics
               </Text>
-              <MetricRow label="TCP (target)" value={pct(tw.tcp)} sub={tw.tcpStructure} />
+              <MetricRow
+                label="TCP (target)"
+                value={formatTcpPercent(tw.tcpRaw ?? tw.tcp)}
+                sub={tw.tcpStructure}
+              />
               <MetricRow label="UTCP (CFTC)" value={pct(tw.utcp)} sub="TCP × Π(1−NTCP)" />
               <MetricRow label="P+ (Brahme)" value={pct(tw.pPlus)} sub="TCP − NTCP_critical" />
               <MetricRow label="TWI" value={pct(tw.twi)} sub={tw.twiInterpretation} />
@@ -153,7 +168,7 @@ export default function TherapeuticWindowScreen() {
                 <Text key={s.structureName} className="text-sm" style={{ color: colors.muted }}>
                   {s.structureName}:{" "}
                   {s.structureType === "target"
-                    ? `TCP ${pct(s.tcp ?? 0)}`
+                    ? `TCP ${formatTcpPercent(s.tcp ?? 0)}`
                     : `NTCP ${pct(s.ntcp ?? 0)}`}
                   {s.literatureOrgan ? ` (${s.literatureOrgan})` : ""}
                 </Text>

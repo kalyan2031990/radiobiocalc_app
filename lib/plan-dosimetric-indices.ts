@@ -147,6 +147,11 @@ function dosePercentile(dvh: DVHPoint[], pct: number): number {
 
 }
 
+/** Dose at cumulative volume percentile (e.g. D95 = dose to 95% of structure volume). */
+export function cumulativeDosePercentile(dvh: DVHPoint[], volumePercent: number): number {
+  return dosePercentile(dvh, volumePercent);
+}
+
 
 
 /**

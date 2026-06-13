@@ -1,6 +1,6 @@
 /**
  * Site- and organ-specific optional clinical fields (dropdown-first).
- * Applies to both TCP (target) and NTCP (OAR) sessions — traceability only.
+ * User-entered values adjust TCP/NTCP via log-odds covariates when provided.
  */
 
 import type { CancerSiteId } from "@/server/sites-registry";

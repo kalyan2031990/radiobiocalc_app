@@ -1,5 +1,5 @@
 /**
- * Export analysis report — PDF and DOCX saved on device (no server required on mobile).
+ * Export analysis report — PDF and DOCX saved on device / browser download on desktop.
  */
 
 import {
@@ -16,25 +16,31 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useState } from "react";
+import { createElement, useCallback, useEffect, useState } from "react";
 import * as Print from "expo-print";
-import { trpc } from "@/lib/trpc";
-import { isOfflineBuild, OFFLINE_EXPORT_HINT } from "@/lib/offline-mode";
-import { buildClinicalReportSections } from "@/lib/clinical-report-sections";
-import { parseClinicalContext } from "@/lib/clinical-fields-schema";
-import { buildAnalysisReport } from "@/server/analysis-report";
+import { isDesktopClient, isOfflineBuild, OFFLINE_EXPORT_HINT } from "@/lib/offline-mode";
+import {
+  buildAnalysisReport,
+  type AnalysisReportOutput,
+} from "@/server/analysis-report";
 import {
   notifyReportSaved,
   persistReportFile,
+  printHtmlReportWeb,
   saveBytesReport,
   saveTextReport,
   shareSavedReport,
 } from "@/lib/report-file-export";
+import { buildClinicalReportSections } from "@/lib/clinical-report-sections";
+import { parseClinicalContext } from "@/lib/clinical-fields-schema";
+import { buildCompositeReportExtras } from "@/lib/export-report-builder";
+import { attachReportCharts } from "@/lib/enrich-report-charts";
+import type { AnalysisReportInput } from "@/server/analysis-report";
 
-/** Native apps build and store reports on-device; web may use API when online. */
+/** Native apps + offline/desktop browser build reports on-device. */
 function useOnDeviceReportBuilder(): boolean {
   if (Platform.OS === "android" || Platform.OS === "ios") return true;
-  return isOfflineBuild();
+  return isOfflineBuild() || isDesktopClient();
 }
 
 export default function ReportExportScreen() {
@@ -42,17 +48,13 @@ export default function ReportExportScreen() {
   const colors = useColors();
   const params = useLocalSearchParams();
   const onDevice = useOnDeviceReportBuilder();
-  const [lastHtml, setLastHtml] = useState<string | null>(null);
-  const [lastDocx, setLastDocx] = useState<string | null>(null);
-  const [filenameBase, setFilenameBase] = useState("rbGyanX_report");
+  const [lastReport, setLastReport] = useState<AnalysisReportOutput | null>(null);
   const [includeClinicalInReport, setIncludeClinicalInReport] = useState(
     (params.includeClinicalInReport as string) !== "0",
   );
   const [busy, setBusy] = useState(false);
 
-  const generateMutation = trpc.radiobiology.generateAnalysisReport.useMutation();
-
-  const buildPayload = () => {
+  const buildPayload = useCallback(async (): Promise<AnalysisReportInput> => {
     let doseMetricRows: { label: string; value: string; note?: string }[] = [];
     try {
       doseMetricRows = JSON.parse((params.doseMetricsJSON as string) || "[]");
@@ -67,7 +69,22 @@ export default function ReportExportScreen() {
       ? buildClinicalReportSections(clinicalCtx, cancerSite, structureType, organ)
       : undefined;
 
-    return {
+    const parseOpt = (v: string | undefined) => {
+      if (!v) return undefined;
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    const totalDose = parseFloat((params.totalDose as string) || "70");
+    const numFractions = parseInt((params.numFractions as string) || "35", 10);
+    const technique = (params.technique as string) || "IMRT";
+
+    const compositeExtras = await buildCompositeReportExtras(
+      (params.dvhSessionId as string) || undefined,
+      { totalDose, numFractions, cancerSite, technique },
+    );
+
+    return attachReportCharts({
       patientId: (params.patientId as string) || "—",
       planLabel: (params.planLabel as string) || "Plan",
       organ,
@@ -75,11 +92,15 @@ export default function ReportExportScreen() {
       structureType,
       model: (params.model as string) || "lkb_loglogit",
       cancerSite,
-      technique: (params.technique as string) || "IMRT",
-      totalDose: parseFloat((params.totalDose as string) || "70"),
-      numFractions: parseInt((params.numFractions as string) || "35", 10),
-      tcp: params.tcp ? parseFloat(params.tcp as string) : undefined,
-      ntcp: params.ntcp ? parseFloat(params.ntcp as string) : undefined,
+      technique,
+      totalDose,
+      numFractions,
+      tcp: parseOpt(params.tcp as string),
+      ntcp: parseOpt(params.ntcp as string),
+      baseTcp: parseOpt(params.baseTcp as string),
+      baseNtcp: parseOpt(params.baseNtcp as string),
+      covariatesApplied: params.applyClinicalCovariates === "1",
+      clinicalDataNote: (params.clinicalDataNote as string) || undefined,
       bed: parseFloat((params.bed as string) || "0"),
       eqd2: parseFloat((params.eqd2 as string) || "0"),
       meanDose: parseFloat((params.meanDose as string) || "0"),
@@ -88,30 +109,21 @@ export default function ReportExportScreen() {
       doseMetricRows,
       includeClinicalInReport,
       clinicalSections,
-    };
-  };
+      ...(compositeExtras ?? {}),
+    });
+  }, [params, includeClinicalInReport]);
 
-  const generateReport = async () => {
-    const payload = buildPayload();
-    if (onDevice) {
-      return buildAnalysisReport(payload);
-    }
-    try {
-      const res = await generateMutation.mutateAsync(payload);
-      if (res.success && res.data) return res.data;
-      throw new Error(res.error ?? "Generation failed");
-    } catch {
-      return buildAnalysisReport(payload);
-    }
-  };
+  const generateReport = useCallback(async (): Promise<AnalysisReportOutput> => {
+    const payload = await buildPayload();
+    return buildAnalysisReport(payload);
+  }, [buildPayload]);
 
-  const handleGenerate = async () => {
+  const ensureReport = useCallback(async (): Promise<AnalysisReportOutput | null> => {
+    if (lastReport) return lastReport;
     setBusy(true);
     try {
       const data = await generateReport();
-      setLastHtml(data.html);
-      setLastDocx(data.docxText);
-      setFilenameBase(data.filenameBase);
+      setLastReport(data);
       return data;
     } catch (e) {
       Alert.alert("Report", e instanceof Error ? e.message : "Unknown error");
@@ -119,29 +131,52 @@ export default function ReportExportScreen() {
     } finally {
       setBusy(false);
     }
+  }, [generateReport, lastReport]);
+
+  const handleGenerate = async () => {
+    setLastReport(null);
+    setBusy(true);
+    try {
+      const data = await generateReport();
+      setLastReport(data);
+    } catch (e) {
+      Alert.alert("Report", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
   };
+
+  useEffect(() => {
+    void handleGenerate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generate once when screen opens
+  }, []);
 
   const handlePdf = async () => {
     setBusy(true);
     try {
-      const data = lastHtml
-        ? { html: lastHtml, docxText: lastDocx ?? "", filenameBase, docxBase64: "" }
-        : await handleGenerate();
-      const html = data?.html;
-      if (!html) return;
+      const data = await ensureReport();
+      if (!data?.html) return;
 
       if (Platform.OS === "web") {
-        const w = window.open("", "_blank");
-        if (w) {
-          w.document.write(html);
-          w.document.close();
-          w.print();
+        const printed = printHtmlReportWeb(data.html);
+        if (!printed) {
+          const saved = await saveTextReport(`${data.filenameBase}.html`, data.html);
+          notifyReportSaved(saved, "HTML report");
+          Alert.alert(
+            "Print blocked",
+            "Your browser blocked the print dialog. An HTML report was downloaded — open it and use Ctrl+P → Save as PDF.",
+          );
+          return;
         }
+        Alert.alert(
+          "Save as PDF",
+          "In the print dialog, choose “Save as PDF” or “Microsoft Print to PDF” as the destination.",
+        );
         return;
       }
 
-      const { uri: tempUri } = await Print.printToFileAsync({ html });
-      const saved = await persistReportFile(tempUri, `${data!.filenameBase}.pdf`);
+      const { uri: tempUri } = await Print.printToFileAsync({ html: data.html });
+      const saved = await persistReportFile(tempUri, `${data.filenameBase}.pdf`);
       notifyReportSaved(saved, "PDF");
     } catch (e) {
       Alert.alert("PDF", e instanceof Error ? e.message : "Could not save PDF");
@@ -153,29 +188,16 @@ export default function ReportExportScreen() {
   const handleDocx = async () => {
     setBusy(true);
     try {
-      const data = await (lastHtml && lastDocx
-        ? Promise.resolve({
-            html: lastHtml,
-            docxText: lastDocx,
-            filenameBase,
-            docxBase64: "",
-          })
-        : handleGenerate());
+      const data = await ensureReport();
       if (!data) return;
 
       if (data.docxBase64) {
-        const saved = await saveBytesReport(
-          `${data.filenameBase}.docx`,
-          data.docxBase64,
-        );
+        const saved = await saveBytesReport(`${data.filenameBase}.docx`, data.docxBase64);
         notifyReportSaved(saved, "DOCX");
         return;
       }
 
-      const saved = await saveTextReport(
-        `${data.filenameBase}.docx.txt`,
-        data.docxText,
-      );
+      const saved = await saveTextReport(`${data.filenameBase}.docx.txt`, data.docxText);
       Alert.alert(
         "DOCX saved as text",
         `${saved.filename}\n\nOpen in Word or rename to .docx if needed.`,
@@ -183,8 +205,7 @@ export default function ReportExportScreen() {
           { text: "OK" },
           {
             text: "Share",
-            onPress: () =>
-              void shareSavedReport(saved, "text/plain"),
+            onPress: () => void shareSavedReport(saved, "text/plain"),
           },
         ],
       );
@@ -195,11 +216,11 @@ export default function ReportExportScreen() {
     }
   };
 
-  const pending = busy || generateMutation.isPending;
+  const pending = busy;
 
   return (
     <ScreenContainer className="bg-background">
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}>
         <Pressable onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
@@ -207,8 +228,9 @@ export default function ReportExportScreen() {
           Export report
         </Text>
         <Text style={{ color: colors.muted }}>
-          TCP/NTCP, QUANTEC-oriented metrics, and literature references. On mobile, PDF and
-          DOCX are generated and saved on this device.
+          {Platform.OS === "web"
+            ? "Preview below, then download DOCX or print/save as PDF in your browser."
+            : "TCP/NTCP, QUANTEC-oriented metrics, and literature references — saved on this device."}
         </Text>
         {onDevice ? (
           <View
@@ -221,7 +243,9 @@ export default function ReportExportScreen() {
             }}
           >
             <Text style={{ color: "#065F46", fontSize: 13 }}>
-              {OFFLINE_EXPORT_HINT}
+              {Platform.OS === "web"
+                ? "Desktop mode: reports are built on this PC (no server). DOCX downloads directly; PDF uses Print → Save as PDF."
+                : OFFLINE_EXPORT_HINT}
             </Text>
           </View>
         ) : null}
@@ -248,13 +272,16 @@ export default function ReportExportScreen() {
           </View>
           <Switch
             value={includeClinicalInReport}
-            onValueChange={setIncludeClinicalInReport}
+            onValueChange={(v) => {
+              setIncludeClinicalInReport(v);
+              setLastReport(null);
+            }}
             trackColor={{ false: colors.border, true: colors.primary }}
           />
         </View>
 
         <Pressable
-          onPress={handleGenerate}
+          onPress={() => void handleGenerate()}
           disabled={pending}
           style={{
             backgroundColor: colors.surface,
@@ -268,13 +295,55 @@ export default function ReportExportScreen() {
             <ActivityIndicator color={colors.primary} />
           ) : (
             <Text style={{ color: colors.foreground, fontWeight: "600", textAlign: "center" }}>
-              Generate report preview
+              {lastReport ? "Regenerate report preview" : "Generate report preview"}
             </Text>
           )}
         </Pressable>
 
+        {lastReport ? (
+          <View
+            style={{
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: colors.border,
+              overflow: "hidden",
+              backgroundColor: "#fff",
+            }}
+          >
+            <Text
+              style={{
+                padding: 10,
+                fontWeight: "600",
+                color: colors.foreground,
+                backgroundColor: colors.surface,
+              }}
+            >
+              Preview — {lastReport.filenameBase}
+            </Text>
+            {Platform.OS === "web"
+              ? createElement("iframe", {
+                  srcDoc: lastReport.html,
+                  style: {
+                    width: "100%",
+                    height: 480,
+                    border: "none",
+                    backgroundColor: "#fff",
+                  },
+                  title: "Report preview",
+                })
+              : (
+                <ScrollView style={{ maxHeight: 320, padding: 12 }}>
+                  <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "monospace" }}>
+                    {lastReport.docxText.slice(0, 2500)}
+                    {lastReport.docxText.length > 2500 ? "\n\n…" : ""}
+                  </Text>
+                </ScrollView>
+              )}
+          </View>
+        ) : null}
+
         <Pressable
-          onPress={handlePdf}
+          onPress={() => void handlePdf()}
           disabled={pending}
           style={{
             backgroundColor: colors.primary,
@@ -288,17 +357,19 @@ export default function ReportExportScreen() {
         >
           <MaterialIcons name="picture-as-pdf" size={28} color="#fff" />
           <View>
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Save PDF on device</Text>
+            <Text style={{ color: "#fff", fontWeight: "700" }}>
+              {Platform.OS === "web" ? "Print / Save as PDF" : "Save PDF on device"}
+            </Text>
             <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}>
               {Platform.OS === "web"
-                ? "Browser print → Save as PDF"
+                ? "Opens print dialog → choose Save as PDF"
                 : "Creates PDF in app reports folder"}
             </Text>
           </View>
         </Pressable>
 
         <Pressable
-          onPress={handleDocx}
+          onPress={() => void handleDocx()}
           disabled={pending}
           style={{
             backgroundColor: colors.surface,
@@ -315,10 +386,10 @@ export default function ReportExportScreen() {
           <MaterialIcons name="article" size={28} color={colors.primary} />
           <View>
             <Text style={{ color: colors.foreground, fontWeight: "700" }}>
-              Save DOCX on device
+              {Platform.OS === "web" ? "Download DOCX" : "Save DOCX on device"}
             </Text>
             <Text style={{ color: colors.muted, fontSize: 12 }}>
-              Word-compatible file — open in Microsoft Word
+              Word-compatible .docx file
             </Text>
           </View>
         </Pressable>

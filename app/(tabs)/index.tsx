@@ -18,6 +18,7 @@ import {
   OFFLINE_MODE_LABEL,
   OFFLINE_EXPORT_HINT,
 } from "@/lib/offline-mode";
+import { isClinicianMobileApk, showDeveloperTools } from "@/lib/clinician-build";
 import { useApiClient } from "@/lib/api-client-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
@@ -86,9 +87,14 @@ export default function HomeScreen() {
             >
               {APP_TAGLINE}
             </Text>
-            <Pressable onPress={() => router.push("/product-info")}>
+            <Pressable onPress={() => router.push("/mobile-user-guide")}>
               <Text style={{ color: colors.primary, fontSize: 13, textDecorationLine: "underline" }}>
-                Product, validation & roadmap
+                User guide
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => router.push("/product-info")}>
+              <Text style={{ color: colors.muted, fontSize: 12, textDecorationLine: "underline", marginTop: 4 }}>
+                About & disclaimer
               </Text>
             </Pressable>
             {usesLocalEngine() ? (
@@ -103,27 +109,29 @@ export default function HomeScreen() {
                       : OFFLINE_MODE_LABEL}
                   </Text>
                 </View>
-                <Pressable onPress={() => router.push("/pilot-api-setup")}>
-                  <View
-                    className="rounded-lg px-4 py-3"
-                    style={{ backgroundColor: "#DBEAFE", borderWidth: 1, borderColor: "#93C5FD" }}
-                  >
-                    <View className="flex-row items-center justify-between gap-2">
-                      <View className="flex-row items-center gap-2 flex-1">
-                        <MaterialIcons name="cloud-upload" size={22} color="#1D4ED8" />
-                        <Text style={{ color: "#1E3A8A", fontWeight: "600", fontSize: 13, flex: 1 }}>
-                          Export server (optional)
-                        </Text>
+                {!isClinicianMobileApk() && (
+                  <Pressable onPress={() => router.push("/pilot-api-setup")}>
+                    <View
+                      className="rounded-lg px-4 py-3"
+                      style={{ backgroundColor: "#DBEAFE", borderWidth: 1, borderColor: "#93C5FD" }}
+                    >
+                      <View className="flex-row items-center justify-between gap-2">
+                        <View className="flex-row items-center gap-2 flex-1">
+                          <MaterialIcons name="cloud-upload" size={22} color="#1D4ED8" />
+                          <Text style={{ color: "#1E3A8A", fontWeight: "600", fontSize: 13, flex: 1 }}>
+                            Export server (optional)
+                          </Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={22} color="#1D4ED8" />
                       </View>
-                      <MaterialIcons name="chevron-right" size={22} color="#1D4ED8" />
+                      <Text style={{ color: "#1E40AF", fontSize: 11, marginTop: 6 }}>
+                        {isExportServerConfigured()
+                          ? `Active: ${apiBaseUrl}`
+                          : OFFLINE_EXPORT_HINT}
+                      </Text>
                     </View>
-                    <Text style={{ color: "#1E40AF", fontSize: 11, marginTop: 6 }}>
-                      {isExportServerConfigured()
-                        ? `Active: ${apiBaseUrl}`
-                        : OFFLINE_EXPORT_HINT}
-                    </Text>
-                  </View>
-                </Pressable>
+                  </Pressable>
+                )}
               </View>
             ) : (
               <Pressable
@@ -147,21 +155,23 @@ export default function HomeScreen() {
           </View>
 
           <View className="gap-4 px-4">
-            <Pressable
-              onPress={() => router.push("/auth/login")}
-              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-            >
-              <View
-                className="rounded-xl px-4 py-3 flex-row items-center justify-between"
-                style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+            {!isClinicianMobileApk() && (
+              <Pressable
+                onPress={() => router.push("/auth/login")}
+                style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
               >
-                <View className="flex-row items-center gap-2">
-                  <MaterialIcons name="account-circle" size={22} color={colors.primary} />
-                  <Text style={{ color: colors.foreground, fontWeight: "600" }}>Sign in / Register</Text>
+                <View
+                  className="rounded-xl px-4 py-3 flex-row items-center justify-between"
+                  style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+                >
+                  <View className="flex-row items-center gap-2">
+                    <MaterialIcons name="account-circle" size={22} color={colors.primary} />
+                    <Text style={{ color: colors.foreground, fontWeight: "600" }}>Sign in / Register</Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
                 </View>
-                <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
-              </View>
-            </Pressable>
+              </Pressable>
+            )}
 
             <Pressable
               onPress={handleLoadDVH}
@@ -291,12 +301,17 @@ export default function HomeScreen() {
             </View>
           )}
 
+          {showDeveloperTools() && (
+            <View className="gap-2 px-4">
+              <Pressable onPress={() => router.push("/auto-demo")}>
+                <Text style={{ color: colors.muted, fontSize: 13, textAlign: "center" }}>
+                  Replay anonymised feature tour
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
           <View className="gap-2 px-4">
-            <Pressable onPress={() => router.push("/auto-demo")}>
-              <Text style={{ color: colors.muted, fontSize: 13, textAlign: "center" }}>
-                Replay anonymised feature tour
-              </Text>
-            </Pressable>
             <Text className="text-sm text-muted" style={{ color: colors.muted }}>
               BED · EUD · gEUD · TCP/NTCP · rb X explainability
             </Text>
@@ -334,22 +349,16 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              {/* Development credits */}
+              {/* Credits — full detail in Product info */}
               <View className="pt-3 border-t" style={{ borderColor: colors.border }}>
-                <Text className="text-xs font-semibold text-foreground mb-2" style={{ color: colors.foreground }}>
-                  Development Credits
-                </Text>
-                <Text className="text-xs text-muted leading-relaxed mb-2" style={{ color: colors.muted }}>
-                  K. Mondal — original developer, based on the published Python NTCP pipeline (py_ntcpx).
-                  Medical Physicist, North Bengal Medical College, Darjeeling, India.
-                </Text>
-                <Text className="text-xs text-muted leading-relaxed mb-2" style={{ color: colors.muted }}>
-                  Co-developed and enhanced by: Cursor, Claude, and Manus AI (mobile rbGyanX, desktop
-                  CDSS, and automated QA).
-                </Text>
-                <Pressable onPress={() => router.push("/product-info")} className="mb-2">
+                <Pressable onPress={() => router.push("/mobile-user-guide")} className="mb-2">
                   <Text className="text-xs" style={{ color: colors.primary }}>
-                    Version & feature roadmap →
+                    User guide →
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => router.push("/product-info")} className="mb-2">
+                  <Text className="text-xs" style={{ color: colors.muted }}>
+                    About the team →
                   </Text>
                 </Pressable>
                 <Text className="text-xs text-muted italic mt-2" style={{ color: colors.muted }}>
