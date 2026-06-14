@@ -31,7 +31,7 @@ const config: ExpoConfig = {
   slug: env.appSlug,
   version: "1.0.0",
   extra: {
-    buildNumber: 15,
+    buildNumber: 16,
     offlineBuild: isOfflineBuild,
     pilotBuild: isPilotBuild,
     eas: {
@@ -52,7 +52,7 @@ const config: ExpoConfig = {
     },
   },
   android: {
-    versionCode: 15,
+    versionCode: 16,
     adaptiveIcon: {
       backgroundColor: "#E8EEF4",
       foregroundImage: "./assets/images/android-icon-foreground.png",

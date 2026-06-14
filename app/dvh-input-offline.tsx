@@ -298,6 +298,35 @@ export default function DVHInputOfflineScreen() {
     }
   };
 
+  const handleUploadClinicalXlsx = async () => {
+    try {
+      setLoading(true);
+      setStatus("Reading clinical xlsx…");
+      const pick = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+        ],
+        copyToCacheDirectory: true,
+      });
+      if (pick.canceled || !pick.assets?.[0]) return;
+      const asset = pick.assets[0];
+      const { readDocumentBytes } = await import("@/lib/read-document-bytes");
+      const bytes = await readDocumentBytes(asset);
+      const { saveUploadedClinicalXlsx } = await import("@/lib/clinical-data-service");
+      await saveUploadedClinicalXlsx(asset.name ?? "clinical.xlsx", bytes);
+      Alert.alert(
+        "Clinical data imported",
+        `${asset.name} saved. Link patient rows in plan setup; enable covariates to adjust NTCP.`,
+      );
+    } catch (e) {
+      Alert.alert("Import failed", e instanceof Error ? e.message : "Could not read xlsx");
+    } finally {
+      setLoading(false);
+      setStatus(null);
+    }
+  };
+
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}>
@@ -337,6 +366,24 @@ export default function DVHInputOfflineScreen() {
             }}
           >
             <Text style={{ color: "#fff", fontWeight: "600" }}>Pick DVH files (PTV + OAR)</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleUploadClinicalXlsx}
+            disabled={loading}
+            style={{
+              borderRadius: 12,
+              paddingVertical: 14,
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            <Text style={{ color: colors.foreground, fontWeight: "600" }}>
+              Import clinical xlsx (optional)
+            </Text>
           </Pressable>
 
           {loading && (

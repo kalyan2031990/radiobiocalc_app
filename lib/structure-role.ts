@@ -13,11 +13,14 @@ const OAR_NAME_PATTERNS =
  * Infer evaluation role from TPS structure label and/or filename.
  * OAR patterns are checked before target patterns (avoids false TCP on combined parotid).
  */
+import { isBodyStructure } from "@/lib/body-structure";
+
 export function inferEvaluationRole(
   structureName: string,
   fileHint?: string,
   declaredType?: string,
 ): "target" | "oar" {
+  if (isBodyStructure(structureName)) return "oar";
   const lit = mapToLiteratureOrgan(structureName, fileHint);
   if (lit && TARGET_LITERATURE_ORGANS.has(lit)) return "target";
   if (lit) return "oar";

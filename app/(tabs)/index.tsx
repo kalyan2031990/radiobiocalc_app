@@ -23,6 +23,7 @@ import { useApiClient } from "@/lib/api-client-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { VisualGuidePanel } from "@/components/visual-guide-panel";
 
 
 interface RecentCalculation {
@@ -320,6 +321,11 @@ export default function HomeScreen() {
             </Text>
           </View>
 
+          {/* Visual guide */}
+          <View className="px-4">
+            <VisualGuidePanel />
+          </View>
+
           {/* Info Section with Developer Information */}
           <View className="gap-3 px-4">
             <View
@@ -344,24 +350,32 @@ export default function HomeScreen() {
                     className="text-sm text-muted mt-2 leading-relaxed"
                     style={{ color: colors.muted }}
                   >
-                    Mobile rbGyanX evaluates one patient and one plan: physical DVH metrics plus BED, EUD, gEUD, TCP, and NTCP with QUANTEC-style literature parameters (editable). Simple descriptive statistics support plan QA. Full cohort / DICOM pipeline with XAI: use desktop rbGyanX. User help guide: in preparation.
+                    Mobile rbGyanX evaluates one patient and one plan: QUANTEC/RTOG physical metrics, BED, gEUD, TCP/NTCP (all literature models), composite therapeutic window, and exploratory clinical covariates from xlsx. Toggle the visual user guide on the home screen.
                   </Text>
                 </View>
               </View>
 
-              {/* Credits — full detail in Product info */}
-              <View className="pt-3 border-t" style={{ borderColor: colors.border }}>
-                <Pressable onPress={() => router.push("/mobile-user-guide")} className="mb-2">
+              {/* Credits */}
+              <View className="pt-3 border-t gap-2" style={{ borderColor: colors.border }}>
+                <Pressable onPress={() => router.push("/mobile-user-guide")} className="mb-1">
                   <Text className="text-xs" style={{ color: colors.primary }}>
                     User guide →
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => router.push("/product-info")} className="mb-2">
-                  <Text className="text-xs" style={{ color: colors.muted }}>
+                <Pressable onPress={() => router.push("/product-info")} className="mb-1">
+                  <Text className="text-xs" style={{ color: colors.primary }}>
                     About the team →
                   </Text>
                 </Pressable>
-                <Text className="text-xs text-muted italic mt-2" style={{ color: colors.muted }}>
+                <Text className="text-xs leading-relaxed" style={{ color: colors.muted }}>
+                  <Text style={{ fontWeight: "600" }}>Primary developer:</Text> K. Mondal (Medical
+                  Physicist), North Bengal Medical College, Darjeeling, India
+                </Text>
+                <Text className="text-xs leading-relaxed" style={{ color: colors.muted }}>
+                  Evolved from the original NTCP Analysis Pipeline. Enhanced with Claude AI;
+                  developed on the Manus AI platform with automated QA.
+                </Text>
+                <Text className="text-xs text-muted italic mt-1" style={{ color: colors.muted }}>
                   Copyright © rbGyanX Academic Team
                 </Text>
               </View>

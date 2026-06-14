@@ -61,6 +61,7 @@ export type TherapeuticWindowDoseResponseParams = {
   prescriptionDose: number;
   planTcp: number;
   planNtcp: number;
+  planTwi?: number;
   tcpStructure: string;
   tcpOrgan: string;
   tcpModel: string;
@@ -71,6 +72,8 @@ export type TherapeuticWindowDoseResponseParams = {
   ntcpModel: string;
   ntcpTd50: number;
   ntcpGamma: number;
+  compositeNtcpLabel?: string;
+  allOarSummary?: string;
 };
 
 export function generateTherapeuticWindowDoseResponseSvg(
@@ -135,10 +138,19 @@ export function generateTherapeuticWindowDoseResponseSvg(
     .join("");
 
   const caption =
-    `Rx ${rx.toFixed(1)} Gy · TCP ${(p.planTcp * 100).toFixed(1)}% (${p.tcpStructure}) · ` +
-    `NTCP ${(p.planNtcp * 100).toFixed(1)}% (${p.ntcpStructure})`;
+    `Rx ${rx.toFixed(1)} Gy · PTV TCP ${(p.planTcp * 100).toFixed(1)}% (${p.tcpStructure}) · ` +
+    `${p.compositeNtcpLabel ?? "Composite NTCP"} ${(p.planNtcp * 100).toFixed(1)}%` +
+    (p.planTwi != null ? ` · TWI ${(p.planTwi * 100).toFixed(1)}%` : "");
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Therapeutic window dose response">
+  const twiNote =
+    p.planTwi != null
+      ? `<text x="${padL}" y="${height - 4}" font-size="9" fill="${PRINT.warning}">TWI = TCP − Σλ·NTCP = ${(p.planTwi * 100).toFixed(1)}% (exploratory composite)</text>`
+      : "";
+  const oarNote = p.allOarSummary
+    ? `<text x="${padL}" y="34" font-size="9" fill="${PRINT.muted}">OAR NTCPs: ${p.allOarSummary}</text>`
+    : "";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Therapeutic window — PTV TCP vs composite NTCP">
 <rect x="0" y="0" width="${width}" height="${height}" fill="${PRINT.surface}" rx="8"/>
 ${gridH}
 ${gridV}
@@ -154,12 +166,16 @@ ${gridV}
 <text x="${width / 2}" y="${height - 6}" font-size="12" fill="${PRINT.foreground}" text-anchor="middle" font-weight="bold">Dose (Gy)</text>
 <text x="16" y="${height / 2}" font-size="12" fill="${PRINT.foreground}" text-anchor="middle" font-weight="bold" transform="rotate(-90 16 ${height / 2})">Probability (%)</text>
 <text x="${padL}" y="22" font-size="11" fill="${PRINT.muted}">${caption}</text>
-<rect x="${width - padR - 168}" y="${padT}" width="164" height="62" fill="${PRINT.background}" stroke="${PRINT.border}" rx="4"/>
-<text x="${width - padR - 158}" y="${padT + 16}" font-size="10" fill="${PRINT.foreground}" font-weight="bold">Legend</text>
-<line x1="${width - padR - 158}" y1="${padT + 28}" x2="${width - padR - 138}" y2="${padT + 28}" stroke="${PRINT.success}" stroke-width="2.5"/>
-<text x="${width - padR - 132}" y="${padT + 32}" font-size="10" fill="${PRINT.muted}">TCP · ${p.tcpOrgan}</text>
-<line x1="${width - padR - 158}" y1="${padT + 44}" x2="${width - padR - 138}" y2="${padT + 44}" stroke="${PRINT.error}" stroke-width="2.5"/>
-<text x="${width - padR - 132}" y="${padT + 48}" font-size="10" fill="${PRINT.muted}">NTCP · ${p.ntcpOrgan}</text>
-<text x="${padL}" y="${height - 18}" font-size="10" fill="${PRINT.muted}">Shaded band = TCP &gt; limiting OAR NTCP (literature sigmoid curves)</text>
+${oarNote}
+<rect x="${width - padR - 188}" y="${padT}" width="184" height="78" fill="${PRINT.background}" stroke="${PRINT.border}" rx="4"/>
+<text x="${width - padR - 178}" y="${padT + 16}" font-size="10" fill="${PRINT.foreground}" font-weight="bold">Legend</text>
+<line x1="${width - padR - 178}" y1="${padT + 28}" x2="${width - padR - 158}" y2="${padT + 28}" stroke="${PRINT.success}" stroke-width="2.5"/>
+<text x="${width - padR - 152}" y="${padT + 32}" font-size="10" fill="${PRINT.muted}">PTV TCP · ${p.tcpStructure}</text>
+<line x1="${width - padR - 178}" y1="${padT + 44}" x2="${width - padR - 158}" y2="${padT + 44}" stroke="${PRINT.error}" stroke-width="2.5"/>
+<text x="${width - padR - 152}" y="${padT + 48}" font-size="10" fill="${PRINT.muted}">Composite NTCP (max OAR)</text>
+<text x="${width - padR - 178}" y="${padT + 64}" font-size="9" fill="${PRINT.primary}">● green = plan TCP at Rx</text>
+<text x="${width - padR - 178}" y="${padT + 76}" font-size="9" fill="${PRINT.error}">● red = composite NTCP at Rx</text>
+<text x="${padL}" y="${height - 18}" font-size="10" fill="${PRINT.muted}">Green curve: PTV TCP model; Red curve: composite NTCP (literature sigmoid)</text>
+${twiNote}
 </svg>`;
 }

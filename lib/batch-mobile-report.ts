@@ -53,6 +53,9 @@ export function buildMobileAppReportInput(
     numFractions: meta.fractions,
     cancerSite,
     technique,
+    prescriptionGy: meta.totalDoseGy,
+    clinicalBundle: options.clinicalBundle,
+    applyClinicalCovariates: covariatesEnabled(options),
   });
 
   const primaryName =
@@ -172,15 +175,11 @@ export function buildMobileAppReportInput(
     includeClinicalInReport: includeClinical && !!clinicalSections?.length,
     clinicalSections,
     ...(compositeExtras ?? {}),
+    abbreviationNotes: compositeExtras?.abbreviationNotes,
   };
 
-  if (covariatesApplied && compositeExtras?.therapeuticSummaryLines?.length) {
-    const lines = [...compositeExtras.therapeuticSummaryLines];
-    if (structureType === "target" && tcp != null && baseTcp != null) {
-      lines[0] =
-        `TCP ${(tcp * 100).toFixed(1)}% (covariate-adjusted from base ${(baseTcp * 100).toFixed(1)}%)`;
-    }
-    result.therapeuticSummaryLines = lines;
+  if (compositeExtras?.covariatesApplied) {
+    result.covariatesApplied = true;
   }
 
   return attachReportCharts(result);

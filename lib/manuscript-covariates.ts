@@ -41,10 +41,6 @@ function isSmoker(r: ClinicalRecord): boolean {
   return s === "yes" || s === "current" || s === "former";
 }
 
-/**
- * HN exploratory adjustments (literature-informed priors, export-only).
- * Age per decade, chemo boost for TCP, smoking/age for NTCP (parotid/larynx).
- */
 export function applyManuscriptCovariates(
   baseTcp: number | undefined,
   baseNtcp: number | undefined,
@@ -127,6 +123,34 @@ export function applyManuscriptCovariates(
     modelNote:
       "Exploratory log-odds covariate layer (age, sex, chemo, smoking, ECOG, dose) for manuscript export; not validated MV model.",
   };
+}
+
+/** True when TCP is at/near ceiling — covariate shift on TCP is not meaningful to display. */
+export function tcpCovariateInactive(baseTcp: number | undefined): boolean {
+  return baseTcp != null && baseTcp >= 0.995;
+}
+
+export function formatCovariateProbabilityLabel(
+  kind: "tcp" | "ntcp",
+  base: number | undefined,
+  adjusted: number | undefined,
+  adj: CovariateAdjustment,
+): string {
+  if (base == null || adjusted == null) return "—";
+  const basePct = (base * 100).toFixed(1);
+  const adjPct = (adjusted * 100).toFixed(1);
+  if (adj.factorsApplied.length === 0) {
+    return kind === "tcp" ? `TCP ${basePct}%` : `NTCP ${basePct}%`;
+  }
+  if (kind === "tcp" && tcpCovariateInactive(base)) {
+    return `TCP ${basePct}% (covariates inactive at TCP ceiling; see NTCP adjustments)`;
+  }
+  if (Math.abs(adjusted - base) < 0.0005) {
+    return kind === "tcp" ? `TCP ${basePct}%` : `NTCP ${basePct}%`;
+  }
+  return kind === "tcp"
+    ? `TCP ${basePct}% → ${adjPct}%`
+    : `NTCP ${basePct}% → ${adjPct}%`;
 }
 
 export function pearsonR(x: number[], y: number[]): number | null {

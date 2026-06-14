@@ -1,0 +1,155 @@
+[
+ {
+  "case": "RBX-DCM-001",
+  "ntcp_calc": 66.6,
+  "ntcp_app": 67.1,
+  "twi_calc": 45.1,
+  "twi_app": 44.6,
+  "d95_calc": 71.2,
+  "d95_app": 71.0
+ },
+ {
+  "case": "RBX-DCM-002",
+  "ntcp_calc": 19.3,
+  "ntcp_app": 19.6,
+  "twi_calc": 77.6,
+  "twi_app": 76.0,
+  "d95_calc": 59.2,
+  "d95_app": 59.0
+ },
+ {
+  "case": "RBX-DCM-003",
+  "ntcp_calc": 71.6,
+  "ntcp_app": 71.9,
+  "twi_calc": 67.8,
+  "twi_app": 67.6,
+  "d95_calc": 42.8,
+  "d95_app": 43.0
+ },
+ {
+  "case": "RBX-TXT-001",
+  "ntcp_calc": 62.2,
+  "ntcp_app": 62.7,
+  "twi_calc": 35.5,
+  "twi_app": 35.0,
+  "d95_calc": 65.2,
+  "d95_app": 65.4
+ },
+ {
+  "case": "RBX-TXT-002",
+  "ntcp_calc": 81.4,
+  "ntcp_app": 81.7,
+  "twi_calc": 70.6,
+  "twi_app": 70.5,
+  "d95_calc": 66.6,
+  "d95_app": 66.7
+ },
+ {
+  "case": "RBX-TXT-003",
+  "ntcp_calc": 70.5,
+  "ntcp_app": 71.0,
+  "twi_calc": 73.8,
+  "twi_app": 73.7,
+  "d95_calc": 58.1,
+  "d95_app": 58.4
+ },
+ {
+  "case": "RBX-TXT-004",
+  "ntcp_calc": 65.7,
+  "ntcp_app": 66.3,
+  "twi_calc": 42.2,
+  "twi_app": 41.7,
+  "d95_calc": 69.0,
+  "d95_app": 69.0
+ },
+ {
+  "case": "RBX-TXT-005",
+  "ntcp_calc": 77.5,
+  "ntcp_app": 77.9,
+  "twi_calc": 28.5,
+  "twi_app": 28.1,
+  "d95_calc": 58.7,
+  "d95_app": 58.7
+ },
+ {
+  "case": "RBX-TXT-006",
+  "ntcp_calc": 84.5,
+  "ntcp_app": 84.7,
+  "twi_calc": 23.2,
+  "twi_app": 22.8,
+  "d95_calc": 68.0,
+  "d95_app": 68.1
+ },
+ {
+  "case": "RBX-TXT-007",
+  "ntcp_calc": 28.6,
+  "ntcp_app": 29.3,
+  "twi_calc": 86.4,
+  "twi_app": 86.2,
+  "d95_calc": 68.5,
+  "d95_app": 68.8
+ },
+ {
+  "case": "RBX-TXT-008",
+  "ntcp_calc": 49.8,
+  "ntcp_app": 50.6,
+  "twi_calc": 80.1,
+  "twi_app": 79.8,
+  "d95_calc": 67.6,
+  "d95_app": 67.9
+ },
+ {
+  "case": "RBX-TXT-009",
+  "ntcp_calc": 66.6,
+  "ntcp_app": 67.0,
+  "twi_calc": 30.1,
+  "twi_app": 29.6,
+  "d95_calc": 59.2,
+  "d95_app": 59.3
+ },
+ {
+  "case": "RBX-TXT-010",
+  "ntcp_calc": 12.1,
+  "ntcp_app": 12.6,
+  "twi_calc": 91.4,
+  "twi_app": 91.2,
+  "d95_calc": 64.8,
+  "d95_app": 64.9
+ },
+ {
+  "case": "RBX-TXT-011",
+  "ntcp_calc": 82.4,
+  "ntcp_app": 82.7,
+  "twi_calc": 40.3,
+  "twi_app": 39.9,
+  "d95_calc": 63.2,
+  "d95_app": 63.4
+ },
+ {
+  "case": "RBX-TXT-012",
+  "ntcp_calc": 92.8,
+  "ntcp_app": 93.0,
+  "twi_calc": 26.3,
+  "twi_app": 26.0,
+  "d95_calc": 67.0,
+  "d95_app": 67.1
+ },
+ {
+  "case": "RBX-TXT-013",
+  "ntcp_calc": 58.9,
+  "ntcp_app": 59.7,
+  "twi_calc": 77.3,
+  "twi_app": 77.1,
+  "d95_calc": 69.5,
+  "d95_app": 69.8
+ },
+ {
+  "case": "RBX-TXT-014",
+  "ntcp_calc": 84.3,
+  "ntcp_app": 84.5,
+  "twi_calc": 15.9,
+  "twi_app": 15.6,
+  "d95_calc": 68.8,
+  "d95_app": 68.9
+ }
+]

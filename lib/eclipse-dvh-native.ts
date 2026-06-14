@@ -10,7 +10,13 @@ import {
 export type NativeDvhPoint = { dose: number; volume: number };
 
 export type NativeParsedDvh = {
-  patientInfo: { patientId: string; patientName: string; modality: string };
+  patientInfo: {
+    patientId: string;
+    patientName: string;
+    modality: string;
+    prescribedDoseGy?: number;
+    prescribedFractions?: number;
+  };
   structures: { name: string; type: "target" | "oar" }[];
   dvhByStructure: Record<string, NativeDvhPoint[]>;
 };

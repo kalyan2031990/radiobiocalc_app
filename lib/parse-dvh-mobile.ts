@@ -30,6 +30,8 @@ export function mergeDvhsOnDevice(bundles: ParsedDvhBundle[]): ParsedDvhBundle {
       patientId: b.patientInfo?.patientId ?? "UNKNOWN",
       patientName: b.patientInfo?.patientName ?? "patient",
       modality: b.patientInfo?.modality ?? "Eclipse",
+      prescribedDoseGy: b.patientInfo?.prescribedDoseGy,
+      prescribedFractions: b.patientInfo?.prescribedFractions,
     },
     structures: b.structures.map((s) => ({
       name: s.name,

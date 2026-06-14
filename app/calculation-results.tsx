@@ -51,6 +51,10 @@ import {
 } from "@/lib/structure-role";
 import { TcpModelCaution } from "@/components/tcp-model-caution";
 import { capTcpForDisplay, formatTcpPercent } from "@/lib/tcp-display";
+import { computeTargetPlanIndices, type TargetPlanIndices, totalStructureVolume } from "@/lib/plan-dosimetric-indices";
+import { findBodyDvh } from "@/lib/body-structure";
+import { probeStructureModels, type StructureModelRow } from "@/lib/structure-model-probe";
+import type { CovariateAdjustment } from "@/lib/manuscript-covariates";
 
 interface DoseMetrics {
   meanDose: number;
@@ -106,6 +110,9 @@ export default function CalculationResultsScreen() {
   const serverDvhSessionId = params.serverDvhSessionId as string | undefined;
   const therapeuticWindowEligible = params.therapeuticWindowEligible === "1";
   const totalDose = parseFloat(params.totalDose as string);
+  const prescriptionGy = parseFloat(
+    (params.prescriptionGy as string) || (params.totalDose as string),
+  );
   const numFractions = parseInt(params.numFractions as string);
   const organ = params.organ as string;
   const structureName = (params.structureName as string) || organ;
@@ -154,6 +161,9 @@ export default function CalculationResultsScreen() {
 
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [planStats, setPlanStats] = useState<PlanDescriptiveStats | null>(null);
+  const [targetIndices, setTargetIndices] = useState<TargetPlanIndices | null>(null);
+  const [modelRows, setModelRows] = useState<StructureModelRow[]>([]);
+  const [covariateAdj, setCovariateAdj] = useState<CovariateAdjustment | null>(null);
   const [loading, setLoading] = useState(true);
   const [twLoading, setTwLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ResultTab>("summary");
@@ -243,6 +253,7 @@ export default function CalculationResultsScreen() {
           targetType: structureType === "target" ? targetType : undefined,
           parameters: customParameters,
           geudExponent: Number.isNaN(geudExponent) ? 1 : geudExponent,
+          prescriptionGy,
         });
       } else {
         const response = await calculateMutation.mutateAsync({
@@ -262,6 +273,7 @@ export default function CalculationResultsScreen() {
           targetType: structureType === "target" ? targetType : undefined,
           parameters: customParameters,
           geudExponent: Number.isNaN(geudExponent) ? 1 : geudExponent,
+          prescriptionGy,
         });
 
         if (!response.success || !response.data) {
@@ -274,6 +286,7 @@ export default function CalculationResultsScreen() {
       let tcp = data.tcp;
       let ntcp = data.ntcp;
       let covariatesApplied = false;
+      let covDetail: CovariateAdjustment | null = null;
       const cov = resolveClinicalForCovariates({
         ctx: clinicalContext,
         xlsxRecord: clinicalRecord,
@@ -291,6 +304,7 @@ export default function CalculationResultsScreen() {
           cov.record,
           organ,
         );
+        covDetail = adj;
         if (structureType === "target" && adj.adjustedTcp != null && data.tcp != null) {
           tcp = adj.adjustedTcp;
           covariatesApplied = adj.factorsApplied.length > 0;
@@ -300,6 +314,41 @@ export default function CalculationResultsScreen() {
           covariatesApplied = adj.factorsApplied.length > 0;
         }
       }
+
+      if (structureType === "target" && points.length > 0) {
+        setTargetIndices(
+          computeTargetPlanIndices(points, prescriptionGy, {
+            totalDoseGy: totalDose,
+            numFractions,
+            technique,
+          }, {
+            bodyDvh: findBodyDvh(dvhData.structures, dvhData.dvhByStructure),
+            targetVolumeCm3: totalStructureVolume(points),
+          }),
+        );
+      } else {
+        setTargetIndices(null);
+      }
+
+      if (usesLocalEngine() && points.length > 0) {
+        setModelRows(
+          probeStructureModels({
+            dvh: points,
+            totalDose,
+            numFractions,
+            organ,
+            structureType,
+            cancerSite,
+            technique,
+            structureName,
+            selectedModel: model,
+            prescriptionGy,
+          }),
+        );
+      } else {
+        setModelRows([]);
+      }
+      setCovariateAdj(covDetail);
 
       setResult({
         tcp,
@@ -616,6 +665,16 @@ export default function CalculationResultsScreen() {
                   {totalDose.toFixed(1)} Gy
                 </Text>
               </View>
+              {Math.abs(prescriptionGy - totalDose) > 0.05 && (
+                <View className="flex-row justify-between">
+                  <Text className="text-sm text-muted" style={{ color: colors.muted }}>
+                    Prescription (DVH header):
+                  </Text>
+                  <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
+                    {prescriptionGy.toFixed(1)} Gy
+                  </Text>
+                </View>
+              )}
               <View className="flex-row justify-between">
                 <Text
                   className="text-sm text-muted"
@@ -677,6 +736,43 @@ export default function CalculationResultsScreen() {
                   ) : null}
                 </View>
               ))}
+              {structureType === "target" && targetIndices && (
+                <>
+                  <Text className="text-sm font-semibold pt-2" style={{ color: colors.foreground }}>
+                    Plan indices vs {prescriptionGy.toFixed(1)} Gy Rx
+                  </Text>
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-muted" style={{ color: colors.muted }}>TCI (V100% Rx)</Text>
+                    <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
+                      {targetIndices.tciPercent.toFixed(1)}%
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-muted" style={{ color: colors.muted }}>CI (RTOG)</Text>
+                    <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
+                      {targetIndices.ciRtog != null ? targetIndices.ciRtog.toFixed(3) : "N/A"}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-muted" style={{ color: colors.muted }}>HI (ICRU-83)</Text>
+                    <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
+                      {targetIndices.hiIcru83.toFixed(3)}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-muted" style={{ color: colors.muted }}>HI (D2/D98)</Text>
+                    <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
+                      {targetIndices.hiRatio.toFixed(3)}
+                    </Text>
+                  </View>
+                  {targetIndices.ciRtog == null ? (
+                    <Text className="text-xs" style={{ color: colors.muted }}>{targetIndices.ciRtogNote}</Text>
+                  ) : null}
+                  <Text className="text-xs" style={{ color: colors.muted }}>
+                    {targetIndices.indexPackNote}
+                  </Text>
+                </>
+              )}
               {structureType === "oar" && (
                 <Text className="text-xs pt-2" style={{ color: colors.muted }}>
                   D95/D98 are not reported for OARs — use Dmean, Dmax, and organ-specific V/D constraints per QUANTEC.
@@ -724,6 +820,38 @@ export default function CalculationResultsScreen() {
                   <Text className="text-xs text-muted" style={{ color: colors.muted }}>
                     N_eff = {result.zmDetails.nEff.toExponential(3)}, P0 = {result.zmDetails.p0SingleCell.toFixed(4)}
                   </Text>
+                </View>
+              )}
+              {modelRows.length > 0 && (
+                <View className="border-t pt-3 mt-2 gap-2" style={{ borderColor: colors.border }}>
+                  <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
+                    All literature {structureType === "target" ? "TCP" : "NTCP"} models
+                  </Text>
+                  <Text className="text-xs" style={{ color: colors.muted }}>
+                    Same DVH and fractionation; selected model highlighted. Compare before choosing export model.
+                  </Text>
+                  {modelRows.map((row) => (
+                    <View key={row.model} className="flex-row justify-between">
+                      <Text
+                        className="text-sm"
+                        style={{
+                          color: row.isSelected ? colors.primary : colors.muted,
+                          fontWeight: row.isSelected ? "700" : "400",
+                        }}
+                      >
+                        {row.label}
+                      </Text>
+                      <Text
+                        className="text-sm font-mono"
+                        style={{
+                          color: row.isSelected ? colors.primary : colors.foreground,
+                          fontWeight: row.isSelected ? "700" : "400",
+                        }}
+                      >
+                        {row.valuePct.toFixed(1)}%
+                      </Text>
+                    </View>
+                  ))}
                 </View>
               )}
             </View>
@@ -823,6 +951,33 @@ export default function CalculationResultsScreen() {
                   ? "Clinical covariates were applied to TCP/NTCP from linked xlsx and/or fields you entered in Clinical context."
                   : "Enter clinical context fields or link xlsx data to adjust TCP/NTCP; toggle “Apply covariates” for xlsx-only adjustment."}
               </Text>
+              {covariateAdj && covariateAdj.factorsApplied.length > 0 && (
+                <View className="border-t pt-3 mt-2 gap-2" style={{ borderColor: colors.border }}>
+                  <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
+                    Covariate adjustment (log-odds)
+                  </Text>
+                  <Text className="text-xs" style={{ color: colors.muted }}>
+                    {covariateAdj.modelNote}
+                  </Text>
+                  <Text className="text-xs" style={{ color: colors.muted }}>
+                    Factors: {covariateAdj.factorsApplied.join(", ")}
+                  </Text>
+                  {structureType === "target" && result.baseTcp != null && result.tcp != null && (
+                    <Text className="text-xs font-mono" style={{ color: colors.foreground }}>
+                      TCP {(result.baseTcp * 100).toFixed(1)}% → {(result.tcp * 100).toFixed(1)}%
+                      {" "}(Δlogit {covariateAdj.tcpLogOddsDelta >= 0 ? "+" : ""}
+                      {covariateAdj.tcpLogOddsDelta.toFixed(3)})
+                    </Text>
+                  )}
+                  {structureType === "oar" && result.baseNtcp != null && result.ntcp != null && (
+                    <Text className="text-xs font-mono" style={{ color: colors.foreground }}>
+                      NTCP {(result.baseNtcp * 100).toFixed(1)}% → {(result.ntcp * 100).toFixed(1)}%
+                      {" "}(Δlogit {covariateAdj.ntcpLogOddsDelta >= 0 ? "+" : ""}
+                      {covariateAdj.ntcpLogOddsDelta.toFixed(3)})
+                    </Text>
+                  )}
+                </View>
+              )}
               {clinicalRecord ? (
                 <Text className="text-xs" style={{ color: colors.muted }}>
                   Source: {clinicalDataStatusLabel(clinicalRecord)}
@@ -1010,7 +1165,7 @@ export default function CalculationResultsScreen() {
                       numFractions,
                       cancerSite,
                       technique,
-                      prescriptionGy: totalDose,
+                      prescriptionGy,
                       fileHint: (params.fileName as string) || planLabel || "",
                     });
                   } else {
@@ -1020,7 +1175,7 @@ export default function CalculationResultsScreen() {
                       numFractions,
                       cancerSite,
                       technique,
-                      prescriptionGy: totalDose,
+                      prescriptionGy,
                       tcpModel: defaultCompositeTcpModel(cancerSite) as
                         | "lkb_loglogit"
                         | "lkb_probit"

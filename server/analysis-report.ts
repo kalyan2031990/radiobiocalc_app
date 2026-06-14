@@ -53,9 +53,12 @@ export type AnalysisReportInput = {
     maxDose: string;
     d95: string;
     doseMetricRows: { label: string; value: string; note?: string }[];
+    modelProbes?: Array<{ model: string; label: string; valuePct: number; isDefault: boolean }>;
+    covariateNote?: string;
   }>;
   planIndexRows?: { label: string; value: string; note?: string }[];
   therapeuticSummaryLines?: string[];
+  abbreviationNotes?: string[];
   /** Composite plan therapeutic window (uncapped TCP, composite NTCP). */
   planTherapeuticTcp?: number;
   planTherapeuticNtcp?: number;
@@ -84,9 +87,9 @@ export function buildAnalysisReport(input: AnalysisReportInput): AnalysisReportO
 
   const covariateNote =
     input.covariatesApplied && input.structureType === "target" && input.baseTcp != null && input.tcp != null
-      ? ` (base ${(input.baseTcp * 100).toFixed(1)}% → covariate-adjusted ${(input.tcp * 100).toFixed(1)}%)`
+      ? ` (base ${(input.baseTcp * 100).toFixed(1)}% — TCP covariate term inactive at ceiling when base ≥99.5%)`
       : input.covariatesApplied && input.structureType === "oar" && input.baseNtcp != null && input.ntcp != null
-        ? ` (base ${(input.baseNtcp * 100).toFixed(1)}% → covariate-adjusted ${(input.ntcp * 100).toFixed(1)}%)`
+        ? ` (base ${(input.baseNtcp * 100).toFixed(1)}% → adjusted ${(input.ntcp * 100).toFixed(1)}%)`
         : "";
 
   const clinicalSourceLine = input.clinicalDataNote
@@ -162,6 +165,7 @@ ${clinicalSourceLine}
 <table><tr><th>Metric</th><th>Value</th><th>Note</th></tr>${metricRows}</table>
 ${formatChartsHtml(input)}
 ${compositeHtml}
+${formatAbbreviationsHtml(input)}
 ${clinicalHtml}
 ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitation)}</p>` : ""}
 <h2>References</h2><ul>${refs}</ul>
@@ -194,6 +198,9 @@ ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitat
         : [];
     })(),
     ...compositeDocx,
+    ...(input.abbreviationNotes?.length
+      ? ["Abbreviations & formulas:", ...input.abbreviationNotes.map((n) => `  ${n}`), ""]
+      : []),
     ...(compositeDocx.length ? [""] : []),
     ...clinicalDocx,
     ...(clinicalDocx.length ? [""] : []),
@@ -212,6 +219,13 @@ ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitat
     docxBase64: bytesToBase64(docxBuf),
     filenameBase,
   };
+}
+
+function formatAbbreviationsHtml(input: AnalysisReportInput): string {
+  const notes = input.abbreviationNotes ?? [];
+  if (!notes.length) return "";
+  const items = notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("");
+  return `<h2>Abbreviations &amp; formulas</h2><ul style="font-size:12px">${items}</ul>`;
 }
 
 function formatChartsHtml(input: AnalysisReportInput): string {
@@ -310,8 +324,22 @@ function formatCompositeHtml(input: AnalysisReportInput): string {
           `<tr><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.value)}</td><td>${escapeHtml(r.note ?? "")}</td></tr>`,
       )
       .join("");
-    body += `<h3>${escapeHtml(s.structureName)} — physical indices</h3>
+    body += `<h3>${escapeHtml(s.structureName)} — physical indices (${escapeHtml(s.organ)})</h3>
 <table><tr><th>Metric</th><th>Value</th><th>Note</th></tr>${rows}</table>`;
+    if (s.modelProbes?.length) {
+      const mp = s.modelProbes
+        .map((m) => {
+          const val = `${m.valuePct.toFixed(1)}%${m.isDefault ? " *" : ""}`;
+          return `<tr><td>${escapeHtml(m.label)}</td><td>${escapeHtml(val)}</td></tr>`;
+        })
+        .join("");
+      body += `<h4>Model comparison — ${escapeHtml(s.structureName)}</h4>
+<p><em>* default model for composite TWI/UTCP</em></p>
+<table><tr><th>Model</th><th>${s.structureType === "target" ? "TCP" : "NTCP"}</th></tr>${mp}</table>`;
+    }
+    if (s.covariateNote) {
+      body += `<p class="disclaimer" style="font-size:11px"><em>${escapeHtml(s.covariateNote)}</em></p>`;
+    }
   }
 
   if (input.planIndexRows?.length) {

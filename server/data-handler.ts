@@ -27,6 +27,8 @@ export interface PatientInfo {
   patientAge?: number;
   studyDate?: string;
   modality: string;
+  prescribedDoseGy?: number;
+  prescribedFractions?: number;
 }
 
 export interface Structure {
@@ -223,6 +225,8 @@ export function parseCompositeDvh(
       patientId: parsed.patientInfo.patientId,
       patientName: parsed.patientInfo.patientName,
       modality: parsed.patientInfo.modality,
+      prescribedDoseGy: parsed.prescribedDoseGy,
+      prescribedFractions: parsed.prescribedFractions,
       ...(parsed.prescribedDoseGy !== undefined
         ? { studyDate: `Rx${parsed.prescribedDoseGy.toFixed(1)}Gy` }
         : {}),

@@ -6,6 +6,8 @@ import type { TargetPlanIndices } from "@/lib/plan-dosimetric-indices";
 import type { PlanExplanation } from "@/lib/rbgyanx-explain";
 import type { TherapeuticWindowResult } from "@/lib/therapeutic-window";
 
+import type { StructureModelProbe } from "@/lib/composite-model-probe";
+
 export type StructureEvalResult = {
   structureName: string;
   structureType: "target" | "oar";
@@ -13,6 +15,7 @@ export type StructureEvalResult = {
   model: string;
   tcp?: number;
   ntcp?: number;
+  modelProbes?: StructureModelProbe[];
   doseMetrics: {
     meanDose: number;
     maxDose: number;

@@ -7,6 +7,9 @@ export type ParsedDvhBundle = {
     patientId?: string;
     patientName?: string;
     modality?: string;
+    studyDate?: string;
+    prescribedDoseGy?: number;
+    prescribedFractions?: number;
   };
   structures: { name: string; type?: string }[];
   dvhByStructure: Record<string, DVHPoint[]>;

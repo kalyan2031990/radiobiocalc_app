@@ -36,18 +36,36 @@ export default function ProductInfoScreen() {
             {APP_TAGLINE}
           </Text>
 
-          <Section title="Clinical presets vs TCP/NTCP" colors={colors}>
+          <Section title="Credits & acknowledgments" colors={colors}>
             <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
-              Optional fields (age, chemo, smoking, etc.) support MDT documentation on this device.
-              They do not change dose–response math unless advanced covariate adjustment is enabled
-              on desktop rbGyanX.
+              <Text style={{ fontWeight: "600", color: colors.foreground }}>Primary developer: </Text>
+              K. Mondal (Medical Physicist), North Bengal Medical College, Darjeeling, India
+            </Text>
+            <Text className="text-sm leading-relaxed mt-2" style={{ color: colors.muted }}>
+              <Text style={{ fontWeight: "600", color: colors.foreground }}>Foundation: </Text>
+              Original NTCP Analysis Pipeline (K. Mondal)
+            </Text>
+            <Text className="text-sm leading-relaxed mt-2" style={{ color: colors.muted }}>
+              <Text style={{ fontWeight: "600", color: colors.foreground }}>Enhancement: </Text>
+              Claude AI (Anthropic) · Manus AI development platform · automated unit tests &amp; QA
+            </Text>
+            <Text className="text-xs italic mt-3" style={{ color: colors.muted }}>
+              Copyright © rbGyanX Academic Team
             </Text>
           </Section>
 
-          <Section title="DVH import" colors={colors}>
+          <Section title="Clinical presets vs TCP/NTCP" colors={colors}>
             <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
-              Copy PTV and OAR plan .txt files to your phone Downloads folder, then use
-              Import combined plan in the app.
+              Upload radiobiocalc_clinical_input.xlsx on DVH import or plan setup. Toggle
+              “Apply covariates to calculation” for exploratory NTCP adjustment (log-odds priors).
+              TCP covariates are inactive when model TCP is at ceiling (≥99.5%).
+            </Text>
+          </Section>
+
+          <Section title="DVH & clinical import" colors={colors}>
+            <Text className="text-sm leading-relaxed" style={{ color: colors.muted }}>
+              Copy composite DVH .txt to Downloads/rbGyaX_mobile_app_input/. Optionally upload
+              radiobiocalc_clinical_input.xlsx from the import or setup screen.
             </Text>
           </Section>
 

@@ -42,7 +42,7 @@ export const INTENDED_USE = {
     "Research and educational plan-evaluation assistant — not a standalone treatment-authorization system.",
   desktop:
     "Full cohort / DICOM pipeline with XAI: use desktop rbGyanX.",
-  helpDocStatus: "User help guide: in preparation (not published yet).",
+  helpDocStatus: "User guide available in-app (toggle on home screen); auto-updates when guide version changes.",
   validationStatus:
     "Numerical validation — see docs/VALIDATION_AND_RELEASE.md and docs/validation/.",
 } as const;

@@ -21,8 +21,10 @@ const DEFAULT_XLSX =
   "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\radbiocalc_input\\rbGyaX_mobile_app_input\\radiobiocalc_clinical_input.xlsx";
 
 const CLINICAL_XLSX = process.env.CLINICAL_XLSX?.trim() || DEFAULT_XLSX;
+const LOCAL_OUT =
+  process.env.PILOT_OUT_DIR?.trim() ||
+  "C:\\Users\\Sampa\\OneDrive\\Desktop\\rbGyanX_mobile_paper\\radbiocalc_app_input_output\\rbGyanX_v1.0.0_validation_output\\exported_pdfs_clinical";
 const DEVICE_EXPORT_DIR = "/sdcard/Download/rbGyaX_exported_reports_clinical/";
-const LOCAL_OUT = path.join(process.cwd(), "test-output", "mobile-exported-pdfs-clinical");
 
 type Row = {
   patientId: string;
@@ -107,6 +109,11 @@ function main(): void {
   }
 
   fs.mkdirSync(LOCAL_OUT, { recursive: true });
+  for (const f of fs.readdirSync(LOCAL_OUT)) {
+    if (/^rbGyanX_.*\.(pdf|html)$/i.test(f)) {
+      fs.unlinkSync(path.join(LOCAL_OUT, f));
+    }
+  }
   runAdb(["shell", "mkdir", "-p", DEVICE_EXPORT_DIR], true);
   runAdb(["push", CLINICAL_XLSX, `${DEVICE_EXPORT_DIR}${path.basename(CLINICAL_XLSX)}`], true);
 

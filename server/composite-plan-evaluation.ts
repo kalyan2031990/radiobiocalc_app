@@ -20,6 +20,10 @@ import {
   type OarNtcpEntry,
 } from "../lib/therapeutic-window";
 import { resolveCancerSite } from "../lib/infer-cancer-site";
+import { inferTargetTypeFromName } from "../lib/infer-target-type";
+import { isBodyStructure, findBodyDvh } from "../lib/body-structure";
+import { totalStructureVolume } from "../lib/plan-dosimetric-indices";
+import { probeModelsForStructure, type StructureModelProbe } from "../lib/composite-model-probe";
 import {
   defaultCompositeNtcpModel,
   defaultCompositeTcpModel,
@@ -32,6 +36,7 @@ export type StructureEvalResult = {
   model: string;
   tcp?: number;
   ntcp?: number;
+  modelProbes?: StructureModelProbe[];
   doseMetrics: {
     meanDose: number;
     maxDose: number;
@@ -134,11 +139,11 @@ export function evaluateCompositePlan(
 
   for (const struct of data.structures) {
     const name = struct.name;
+    if (isBodyStructure(name)) continue;
     const dvh = data.dvhByStructure[name];
     if (!dvh?.length) continue;
 
-    const role =
-      struct.type ?? inferStructureRole(name, fileHint);
+    const role = struct.type === "target" ? "target" : inferStructureRole(name, fileHint);
     const lit = mapLiteratureOrgan(name, fileHint);
     const organ =
       lit ?? (role === "target" ? "PTV" : name);
@@ -157,7 +162,8 @@ export function evaluateCompositePlan(
         model,
         cancerSite,
         technique,
-        targetType: "PTV",
+        targetType: role === "target" ? inferTargetTypeFromName(name) : undefined,
+        prescriptionGy,
       } as CalculationRequest,
       defaultParams,
     );
@@ -169,6 +175,18 @@ export function evaluateCompositePlan(
       model: calc.model,
       tcp: calc.tcp,
       ntcp: calc.ntcp,
+      modelProbes: probeModelsForStructure({
+        dvh,
+        totalDose,
+        numFractions,
+        organ,
+        structureType: role,
+        cancerSite,
+        technique,
+        structureName: name,
+        defaultModel: model,
+        prescriptionGy,
+      }),
       doseMetrics: {
         meanDose: calc.doseMetrics.meanDose,
         maxDose: calc.doseMetrics.maxDose,
@@ -195,10 +213,16 @@ export function evaluateCompositePlan(
   let targetIndices: TargetPlanIndices | null = null;
 
   if (primaryTarget && data.dvhByStructure[primaryTarget]) {
+    const targetDvh = data.dvhByStructure[primaryTarget] as DVHPoint[];
+    const bodyDvh = findBodyDvh(data.structures, data.dvhByStructure);
     targetIndices = computeTargetPlanIndices(
-      data.dvhByStructure[primaryTarget] as DVHPoint[],
+      targetDvh,
       prescriptionGy,
       { totalDoseGy: totalDose, numFractions, technique },
+      {
+        bodyDvh,
+        targetVolumeCm3: totalStructureVolume(targetDvh),
+      },
     );
     const tr = structureResults.find((s) => s.structureName === primaryTarget);
     if (tr?.tcp != null) {

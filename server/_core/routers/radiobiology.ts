@@ -110,6 +110,7 @@ const CalculationRequestSchema = z.object({
   technique: z.string().optional(),
   targetType: z.string().optional(),
   lqMaxDosePerFractionGy: z.number().optional(),
+  prescriptionGy: z.number().min(0.1).optional(),
   parameters: z
     .object({
       td50: z.number().optional(),

@@ -116,9 +116,12 @@ export default function TherapeuticWindowScreen() {
                 {idx.indexPackNote}
               </Text>
               <MetricRow label="TCI (V≥Rx)" value={`${idx.tciPercent.toFixed(1)}%`} />
-              <MetricRow label="CI RTOG (target DVH)" value={idx.ciRtog.toFixed(3)} />
-              <MetricRow label="HI ICRU (D2/D98)" value={idx.hiIcu.toFixed(3)} />
-              <MetricRow label="HI modified" value={idx.hiModified.toFixed(3)} />
+              <MetricRow
+                label="CI RTOG"
+                value={idx.ciRtog != null ? idx.ciRtog.toFixed(3) : "N/A (no BODY DVH)"}
+              />
+              <MetricRow label="HI (ICRU-83)" value={idx.hiIcru83.toFixed(3)} />
+              <MetricRow label="HI (D2/D98 ratio)" value={idx.hiRatio.toFixed(3)} />
               {idx.ciPaddick != null && (
                 <MetricRow label="CI Paddick" value={idx.ciPaddick.toFixed(3)} />
               )}

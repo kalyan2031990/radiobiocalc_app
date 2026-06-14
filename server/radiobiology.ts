@@ -95,6 +95,8 @@ export interface CalculationRequest {
   technique?: string;
   targetType?: string;
   lqMaxDosePerFractionGy?: number;
+  /** Prescription dose for Vxx/Dxx target metrics (defaults to totalDose). */
+  prescriptionGy?: number;
 }
 
 export interface CalculationResult {
@@ -714,7 +716,7 @@ export function performCalculation(
     : calculateDoseMetrics(dvhDiff);
   if (cumulative && request.structureType === "target") {
     const sorted = [...request.dvh].sort((a, b) => a.dose - b.dose);
-    const rx = request.totalDose;
+    const rx = request.prescriptionGy ?? request.totalDose;
     doseMetrics = {
       ...doseMetrics,
       v95: volumePercentAtLeast(sorted, rx * 0.95),

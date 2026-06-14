@@ -39,7 +39,7 @@ describe("analysis report clinical section", () => {
     expect(report.html).toContain("Clinical context (opt-in)");
     expect(report.html).toContain("HPV status");
     expect(report.docxText).toContain("Concurrent chemotherapy");
-    expect(report.html).toContain("do not adjust dose");
+    expect(report.html).toContain("Apply covariates to TCP/NTCP");
   });
 
   it("omits clinical block when opt-in off", () => {

@@ -16,14 +16,25 @@ import {
 import { getOrganParameters } from "@/server/parameters";
 import { evaluateCompositePlan } from "@/server/composite-plan-evaluation";
 import type { CompositePlanEvaluation } from "@/lib/composite-plan-types";
-import type { ParsedDvhBundle } from "@/lib/plan-evaluation";
+import type { ParsedDvhBundle } from "@/lib/dvh-bundle-types";
+import { getPrescriptionFromBundle } from "@/lib/dvh-prescription";
 
 export function dvhDataToBundle(data: DVHData): ParsedDvhBundle {
+  const rx = getPrescriptionFromBundle({
+    patientInfo: data.patientInfo,
+    structures: [],
+    dvhByStructure: {},
+  });
   return {
     patientInfo: {
       patientId: data.patientInfo.patientId,
       patientName: data.patientInfo.patientName,
       modality: data.patientInfo.modality,
+      studyDate: data.patientInfo.studyDate,
+      prescribedDoseGy:
+        data.patientInfo.prescribedDoseGy ?? rx.prescribedDoseGy,
+      prescribedFractions:
+        data.patientInfo.prescribedFractions ?? rx.prescribedFractions,
     },
     structures: data.structures.map((s) => ({
       name: s.name,
@@ -41,6 +52,9 @@ export function bundleToDvhData(bundle: ParsedDvhBundle): DVHData {
       patientId: bundle.patientInfo?.patientId ?? "LOCAL-001",
       patientName: bundle.patientInfo?.patientName ?? "Offline patient",
       modality: bundle.patientInfo?.modality ?? "RT",
+      studyDate: bundle.patientInfo?.studyDate,
+      prescribedDoseGy: bundle.patientInfo?.prescribedDoseGy,
+      prescribedFractions: bundle.patientInfo?.prescribedFractions,
     },
     structures: bundle.structures.map((s) => ({
       name: s.name,

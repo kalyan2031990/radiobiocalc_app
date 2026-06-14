@@ -183,8 +183,9 @@ export function buildPlanExplanation(
   if (idx) {
     const parts = [
       `TCI ${idx.tciPercent.toFixed(1)}%`,
-      `RTOG-style CI ${idx.ciRtog.toFixed(3)}`,
-      `HI (D2/D98) ${idx.hiIcu.toFixed(3)}`,
+      idx.ciRtog != null ? `RTOG CI ${idx.ciRtog.toFixed(3)}` : "RTOG CI N/A (no BODY DVH)",
+      `HI (ICRU-83) ${idx.hiIcru83.toFixed(3)}`,
+      `HI ratio ${idx.hiRatio.toFixed(3)}`,
     ];
     if (stereotactic && idx.ciPaddick != null) {
       parts.push(`Paddick CI ${idx.ciPaddick.toFixed(3)}`);

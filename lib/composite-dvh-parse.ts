@@ -5,7 +5,13 @@
 export type CompositeDvhPoint = { dose: number; volume: number };
 
 export type CompositeParsedDvh = {
-  patientInfo: { patientId: string; patientName: string; modality: string };
+  patientInfo: {
+    patientId: string;
+    patientName: string;
+    modality: string;
+    prescribedDoseGy?: number;
+    prescribedFractions?: number;
+  };
   structures: { name: string; type: "target" | "oar" }[];
   dvhByStructure: Record<string, CompositeDvhPoint[]>;
   prescribedDoseGy?: number;
@@ -149,6 +155,9 @@ export function parseCompositeDvhContent(
 
     const structureName = line.split(":").slice(1).join(":").trim() || "Unknown";
     let role: "target" | "oar" = "oar";
+    if (/^(BODY|EXTERNAL|PATIENT)$/i.test(structureName.trim())) {
+      role = "oar";
+    }
     let dataStart: number | null = null;
     let blockEnd = lines.length;
 
@@ -188,6 +197,8 @@ export function parseCompositeDvhContent(
       patientId: header.patientId,
       patientName: header.patientName,
       modality: header.modality,
+      prescribedDoseGy: header.prescribedDoseGy,
+      prescribedFractions: header.prescribedFractions,
     },
     structures,
     dvhByStructure,

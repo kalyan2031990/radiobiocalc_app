@@ -13,7 +13,7 @@ export function attachReportCharts(input: AnalysisReportInput): AnalysisReportIn
 
   input.therapeuticWindowChartSvg = generateTherapeuticWindowDoseResponseSvg(p);
   input.therapeuticWindowChartCaption =
-    "Therapeutic window — TCP and NTCP dose–response at plan prescription";
+    "Therapeutic window — PTV TCP (green) vs composite NTCP max OAR (red) at prescription; TWI annotated";
   return input;
 }
 

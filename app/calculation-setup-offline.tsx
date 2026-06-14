@@ -31,6 +31,8 @@ import {
 } from "@/lib/structure-role";
 import { analyzePlanScope } from "@/lib/plan-scope";
 import { inferCancerSiteFromStructureNames } from "@/lib/infer-cancer-site";
+import { getPrescriptionFromBundle } from "@/lib/dvh-prescription";
+import { inferTargetTypeFromName } from "@/lib/infer-target-type";
 import { getUserVersionLine, getVersionLine } from "@/lib/app-meta";
 import { isClinicianMobileApk } from "@/lib/clinician-build";
 import { formatImportedPlanLabel } from "@/lib/user-facing-labels";
@@ -188,6 +190,17 @@ export default function CalculationSetupOfflineScreen() {
   }, [dvhSessionId]);
 
   useEffect(() => {
+    if (!dvhBundle) return;
+    const rx = getPrescriptionFromBundle(dvhBundle);
+    if (rx.prescribedDoseGy && rx.prescribedDoseGy > 0) {
+      setTotalDose(String(rx.prescribedDoseGy));
+    }
+    if (rx.prescribedFractions && rx.prescribedFractions > 0) {
+      setNumFractions(String(rx.prescribedFractions));
+    }
+  }, [dvhBundle]);
+
+  useEffect(() => {
     if (!dvhBundle || fileStructures.length === 0) return;
     const first = fileStructures[0];
     setSelectedStructure(first);
@@ -199,6 +212,7 @@ export default function CalculationSetupOfflineScreen() {
       literatureOrganForRole(first, importedFileName) ??
       mapToLiteratureOrgan(first, importedFileName);
     if (lit) setSelectedOrgan(lit);
+    if (role === "target") setTargetType(inferTargetTypeFromName(first));
     const inferred = inferCancerSiteFromStructureNames(fileStructures, importedFileName);
     if (inferred.siteId !== "UNKNOWN") setCancerSite(inferred.siteId);
   }, [dvhBundle, fileStructures, importedFileName]);
@@ -213,6 +227,7 @@ export default function CalculationSetupOfflineScreen() {
       literatureOrganForRole(name, importedFileName) ??
       mapToLiteratureOrgan(name, importedFileName);
     if (lit) setSelectedOrgan(lit);
+    if (role === "target") setTargetType(inferTargetTypeFromName(name));
   };
 
   const handleCalculate = () => {
@@ -231,6 +246,8 @@ export default function CalculationSetupOfflineScreen() {
       return;
     }
     const structureKey = selectedStructure || fileStructures[0] || selectedOrgan;
+    const rx = getPrescriptionFromBundle(dvhBundle);
+    const prescriptionGy = rx.prescribedDoseGy ?? dose;
     router.push({
       pathname: "/calculation-results",
       params: {
@@ -239,6 +256,7 @@ export default function CalculationSetupOfflineScreen() {
         planScope: planMeta.scope,
         therapeuticWindowEligible: planMeta.therapeuticWindowEligible ? "1" : "0",
         totalDose: String(dose),
+        prescriptionGy: String(prescriptionGy),
         numFractions: String(fractions),
         organ: selectedOrgan,
         structureName: structureKey,
