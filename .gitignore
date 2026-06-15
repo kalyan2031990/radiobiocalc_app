@@ -69,3 +69,7 @@ Thumbs.db
 assets/theme-pptx-extract/
 assets/rbgyanx_mobile.zip
 server/data/email-users.json
+
+# Author-only AI tooling prompts (not for public repo)
+CURSOR_FIX_PROMPT*.md
+CLAUDE_*.md
