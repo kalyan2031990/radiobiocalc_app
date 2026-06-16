@@ -98,6 +98,8 @@ export function offlineEvaluateComposite(
     technique?: string;
     prescriptionGy?: number;
     fileHint?: string;
+    tcpModel?: CalculationRequest["model"];
+    ntcpModel?: CalculationRequest["model"];
   },
 ): CompositePlanEvaluation {
   return evaluateCompositePlan(bundleToDvhData(bundle), {
@@ -107,6 +109,8 @@ export function offlineEvaluateComposite(
     technique: options.technique ?? "IMRT",
     prescriptionGy: options.prescriptionGy ?? options.totalDose,
     fileHint: options.fileHint ?? bundle.patientInfo?.patientName ?? "",
+    tcpModel: options.tcpModel,
+    ntcpModel: options.ntcpModel,
   });
 }
 

@@ -136,15 +136,28 @@ export function getMobileAppInputRoot(): string {
   throw new Error("Set INPUT_FOLDERS to rbGyaX_mobile_app_input directory");
 }
 
+/** DVH `.txt` files may live at root or under `composite_dvh/`. */
+export function resolveCompositeDvhDir(root: string): string {
+  const sub = path.join(root, "composite_dvh");
+  if (
+    fs.existsSync(sub) &&
+    fs.readdirSync(sub).some((f) => /_composite_DVH\.txt$/i.test(f))
+  ) {
+    return sub;
+  }
+  return root;
+}
+
 export function discoverMobileAppCases(root: string): MobileAppCase[] {
+  const dvhDir = resolveCompositeDvhDir(root);
   const bundle = loadClinicalBundles(root);
   const files = fs
-    .readdirSync(root)
+    .readdirSync(dvhDir)
     .filter((f) => /_composite_DVH\.txt$/i.test(f))
     .sort();
 
   return files.map((fileName) => {
-    const filePath = path.join(root, fileName);
+    const filePath = path.join(dvhDir, fileName);
     const content = fs.readFileSync(filePath, "utf8");
     const patientId = patientIdFromCompositeName(fileName);
     const prescribedGy = readPrescribedGy(content);

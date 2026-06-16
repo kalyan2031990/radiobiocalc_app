@@ -75,6 +75,8 @@ export function buildCompositeReportExtrasFromBundle(
     prescriptionGy?: number;
     clinicalBundle?: ClinicalBundle | null;
     applyClinicalCovariates?: boolean;
+    tcpModel?: import("@/server/radiobiology").CalculationRequest["model"];
+    ntcpModel?: import("@/server/radiobiology").CalculationRequest["model"];
   },
 ): CompositeReportExtras | null {
   const keys = Object.keys(bundle.dvhByStructure).filter(
@@ -89,6 +91,8 @@ export function buildCompositeReportExtrasFromBundle(
     cancerSite: options.cancerSite,
     technique: options.technique,
     prescriptionGy,
+    tcpModel: options.tcpModel,
+    ntcpModel: options.ntcpModel,
   });
 
   const indexCtx = {

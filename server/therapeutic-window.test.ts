@@ -27,6 +27,6 @@ describe("therapeutic window / UTCP consistency", () => {
     expect(tw.tcp).toBeCloseTo(0.95, 8);
     expect(tw.tcpRaw).toBeCloseTo(1, 8);
     expect(tw.tcpCapped).toBe(true);
-    expect(tw.utcp).toBeCloseTo(0.95, 8);
+    expect(tw.utcp).toBeCloseTo(1.0, 8);
   });
 });

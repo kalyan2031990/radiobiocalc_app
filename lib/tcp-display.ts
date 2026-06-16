@@ -11,7 +11,7 @@ export const TCP_MODEL_CAUTION =
   "guaranteed clinical tumor control without local validation.";
 
 export const TCP_CAPPED_FOOTNOTE =
-  "Displayed TCP is capped at 95% when the model exceeds that value; UTCP/TWI/P+ use the same display TCP.";
+  "Displayed TCP is capped at 95% when the model exceeds that value; UTCP, P+ and TWI use the uncapped model TCP.";
 
 export type TcpDisplay = {
   display: number;

@@ -81,7 +81,14 @@ export default function ReportExportScreen() {
 
     const compositeExtras = await buildCompositeReportExtras(
       (params.dvhSessionId as string) || undefined,
-      { totalDose, numFractions, cancerSite, technique },
+      {
+        totalDose,
+        numFractions,
+        cancerSite,
+        technique,
+        tcpModel: (params.tcpModel as string) || undefined,
+        ntcpModel: (params.ntcpModel as string) || undefined,
+      },
     );
 
     return attachReportCharts({

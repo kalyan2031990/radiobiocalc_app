@@ -7,6 +7,7 @@ import path from "path";
 import {
   discoverMobileAppCases,
   getMobileAppInputRoot,
+  resolveCompositeDvhDir,
   runEngineForMobileAppCase,
   type EngineCaseResult,
 } from "./mobile-app-input-suite-core";
@@ -33,7 +34,8 @@ function pct(v: number): string {
 }
 
 function auditPrescriptionMismatch(root: string): string {
-  const file = path.join(root, "RBX-TXT-001_composite_DVH.txt");
+  const dvhDir = resolveCompositeDvhDir(root);
+  const file = path.join(dvhDir, "RBX-TXT-001_composite_DVH.txt");
   const content = fs.readFileSync(file, "utf8");
   const bundle = offlineParseDvh(content, "RBX-TXT-001_composite_DVH.txt");
   const ptv = bundle.structures.find((s) => s.type === "target")?.name ?? "PTV 66";
@@ -76,11 +78,12 @@ function structureModelTable(
   doseGy: number,
   fractions: number,
 ): string {
+  const dvhDir = resolveCompositeDvhDir(root);
   const file = fs
-    .readdirSync(root)
+    .readdirSync(dvhDir)
     .find((f) => f.toUpperCase().startsWith(patientId.toUpperCase()));
   if (!file) return "";
-  const content = fs.readFileSync(path.join(root, file), "utf8");
+  const content = fs.readFileSync(path.join(dvhDir, file), "utf8");
   const bundle = offlineParseDvh(content, file);
   const rows: string[] = [
     `### ${patientId} — per-structure models (${doseGy} Gy / ${fractions} fx)`,
@@ -96,7 +99,7 @@ function structureModelTable(
     const targetType = inferTargetTypeFromName(s.name);
     for (const model of MODELS) {
       if (!getOrganParameters(organ, model)) continue;
-      if (s.type === "target" && model === "lkb_probit") continue;
+      if (s.type === "target" && (model === "lkb_probit" || model === "poisson")) continue;
       const calc = offlineCalculate({
         dvh,
         totalDose: doseGy,
@@ -169,8 +172,11 @@ function main() {
   );
 
   const outPath = path.join(OUT_DIR, "04_RADIOBIOLOGY_AUDIT.md");
+  const auditCopy = path.join(OUT_DIR, "engine_results_audit.md");
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  fs.writeFileSync(outPath, lines.join("\n"), "utf8");
+  const body = lines.join("\n");
+  fs.writeFileSync(outPath, body, "utf8");
+  fs.writeFileSync(auditCopy, body, "utf8");
   console.log(`Wrote ${outPath}`);
   console.log(`Engine: ${pass}/${results.length} PASS`);
   if (pass < results.length) {

@@ -46,7 +46,7 @@ export function probeModelsForStructure(opts: {
   const rx = opts.prescriptionGy ?? opts.totalDose;
   for (const model of MODELS) {
     if (!getOrganParameters(opts.organ, model)) continue;
-    if (opts.structureType === "target" && model === "lkb_probit") continue;
+    if (opts.structureType === "target" && (model === "lkb_probit" || model === "poisson")) continue;
     const calc = offlineCalculate({
       dvh: opts.dvh,
       totalDose: opts.totalDose,

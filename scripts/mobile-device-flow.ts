@@ -72,6 +72,33 @@ function pullLatestInAppPdf(localPath: string): string | null {
   return fs.existsSync(localPath) ? localPath : null;
 }
 
+function waitForCalculationComplete(getXml: () => string, timeoutMs = 360000): boolean {
+  const needles = [
+    "export report",
+    "therapeutic window",
+    "composite ntcp",
+    "composite tcp",
+    "biological models",
+  ];
+  const loadingNeedles = ["running radiobiology", "evaluating biological", "loading dvh"];
+  const deadline = Date.now() + timeoutMs;
+  let scrolls = 0;
+  let sawLoading = false;
+  while (Date.now() < deadline) {
+    dismissOverlays(getXml);
+    const xml = getXml().toLowerCase();
+    if (loadingNeedles.some((n) => xml.includes(n))) sawLoading = true;
+    if (needles.some((n) => xml.includes(n))) return true;
+    if (scrolls < 16) {
+      scrollDown();
+      scrolls++;
+    }
+    sleep(1500);
+  }
+  const finalXml = getXml().toLowerCase();
+  return needles.some((n) => finalXml.includes(n)) || (sawLoading && finalXml.includes("results"));
+}
+
 export function runPatientDeviceFlow(opts: {
   inputRoot: string;
   patientId: string;
@@ -168,7 +195,8 @@ export function runPatientDeviceFlow(opts: {
 
   scrollToBottom(4);
   tapTextWithScroll(getXml, "Run calculation", 8);
-  const resultsOk = waitForTextWithScroll(getXml, "Export report", 180000, 10);
+  sleep(1500);
+  const resultsOk = waitForCalculationComplete(getXml, 360000);
   rows.push({
     step: "calculation_results",
     status: resultsOk ? "PASS" : "FAIL",

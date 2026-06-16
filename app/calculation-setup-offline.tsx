@@ -309,7 +309,8 @@ export default function CalculationSetupOfflineScreen() {
 
   return (
     <ScreenContainer className="bg-background">
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }}>
+      <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96, gap: 14 }}>
         <Pressable onPress={() => router.back()}>
           <Text style={{ color: colors.primary, fontWeight: "600" }}>Back</Text>
         </Pressable>
@@ -613,6 +614,19 @@ export default function CalculationSetupOfflineScreen() {
           />
         </View>
 
+      </ScrollView>
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: 16,
+          borderTopWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+        }}
+      >
         <Pressable
           onPress={handleCalculate}
           disabled={!dvhBundle}
@@ -621,13 +635,13 @@ export default function CalculationSetupOfflineScreen() {
             borderRadius: 12,
             paddingVertical: 16,
             alignItems: "center",
-            marginTop: 8,
             opacity: dvhBundle ? 1 : 0.5,
           }}
         >
           <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Run calculation</Text>
         </Pressable>
-      </ScrollView>
+      </View>
+      </View>
     </ScreenContainer>
   );
 }

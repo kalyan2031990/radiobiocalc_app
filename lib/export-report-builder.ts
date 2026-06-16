@@ -15,6 +15,8 @@ export async function buildCompositeReportExtras(
     numFractions: number;
     cancerSite: string;
     technique: string;
+    tcpModel?: string;
+    ntcpModel?: string;
   },
 ): Promise<import("@/lib/export-report-composite").CompositeReportExtras | null> {
   if (!dvhSessionId) return null;
@@ -22,5 +24,9 @@ export async function buildCompositeReportExtras(
   const { buildCompositeReportExtrasFromBundle } = await import("@/lib/export-report-composite");
   const bundle = await loadDvhSession(dvhSessionId);
   if (!bundle) return null;
-  return buildCompositeReportExtrasFromBundle(bundle, options);
+  return buildCompositeReportExtrasFromBundle(bundle, {
+    ...options,
+    tcpModel: options.tcpModel as import("@/server/radiobiology").CalculationRequest["model"] | undefined,
+    ntcpModel: options.ntcpModel as import("@/server/radiobiology").CalculationRequest["model"] | undefined,
+  });
 }

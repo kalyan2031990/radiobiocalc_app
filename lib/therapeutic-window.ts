@@ -109,10 +109,10 @@ export function computeTherapeuticWindow(
   }
   if (ntcpCritical === 0) ntcpCritical = ntcpMax;
 
-  const utcp = tcpC * product;
+  const utcp = tcpRaw * product;
   const cftc = utcp;
-  const pPlus = tcpC - ntcpCritical;
-  const twi = tcpC - weightedSum;
+  const pPlus = tcpRaw - ntcpCritical;
+  const twi = tcpRaw - weightedSum;
 
   return {
     tcp: tcpC,

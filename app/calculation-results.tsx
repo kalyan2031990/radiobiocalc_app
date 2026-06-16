@@ -167,6 +167,14 @@ export default function CalculationResultsScreen() {
   const [loading, setLoading] = useState(true);
   const [twLoading, setTwLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ResultTab>("summary");
+  const [activeModel, setActiveModel] = useState(model);
+  const [compositeTcpModel, setCompositeTcpModel] = useState(
+    structureType === "target" ? model : defaultCompositeTcpModel(cancerSite),
+  );
+  const [compositeNtcpModel, setCompositeNtcpModel] = useState(
+    structureType === "oar" ? model : defaultCompositeNtcpModel(),
+  );
+  const [calcProgress, setCalcProgress] = useState("Running radiobiology engine…");
 
   const evaluatePlanMutation = trpc.radiobiology.evaluateCompositePlan.useMutation();
 
@@ -203,9 +211,12 @@ export default function CalculationResultsScreen() {
     });
   }, [result, structureType, organ, structureName, totalDose, numFractions, technique]);
 
-  const performCalculation = async () => {
+  const performCalculation = async (modelOverride?: string) => {
+    const runModel = modelOverride ?? activeModel;
     try {
       setLoading(true);
+      setCalcProgress("Loading DVH data…");
+      await new Promise((r) => setTimeout(r, 0));
 
       let dvhData: ParsedDvhBundle | null = dvhSessionId
         ? await loadDvhSession(dvhSessionId)
@@ -232,6 +243,8 @@ export default function CalculationResultsScreen() {
       }));
 
       setPlanStats(computePlanDescriptiveStats(points));
+      setCalcProgress("Evaluating biological models…");
+      await new Promise((r) => setTimeout(r, 0));
 
       let data;
       if (usesLocalEngine()) {
@@ -242,7 +255,7 @@ export default function CalculationResultsScreen() {
           numFractions,
           organ,
           structureType,
-          model: model as
+          model: runModel as
             | "lkb_loglogit"
             | "lkb_probit"
             | "poisson"
@@ -262,7 +275,7 @@ export default function CalculationResultsScreen() {
           numFractions,
           organ,
           structureType,
-          model: model as
+          model: runModel as
             | "lkb_loglogit"
             | "lkb_probit"
             | "poisson"
@@ -341,7 +354,7 @@ export default function CalculationResultsScreen() {
             cancerSite,
             technique,
             structureName,
-            selectedModel: model,
+            selectedModel: runModel,
             prescriptionGy,
           }),
         );
@@ -349,6 +362,12 @@ export default function CalculationResultsScreen() {
         setModelRows([]);
       }
       setCovariateAdj(covDetail);
+      if (structureType === "target") {
+        setCompositeTcpModel(runModel);
+      } else {
+        setCompositeNtcpModel(runModel);
+      }
+      setActiveModel(runModel);
 
       setResult({
         tcp,
@@ -379,6 +398,15 @@ export default function CalculationResultsScreen() {
     }
   };
 
+  const selectDriveModel = (nextModel: string) => {
+    if (structureType === "target") {
+      setCompositeTcpModel(nextModel);
+    } else {
+      setCompositeNtcpModel(nextModel);
+    }
+    void performCalculation(nextModel);
+  };
+
   if (loading) {
     return (
       <ScreenContainer className="bg-background items-center justify-center">
@@ -387,7 +415,7 @@ export default function CalculationResultsScreen() {
           className="mt-4 text-muted"
           style={{ color: colors.muted }}
         >
-          Calculating...
+          {calcProgress}
         </Text>
       </ScreenContainer>
     );
@@ -828,29 +856,35 @@ export default function CalculationResultsScreen() {
                     All literature {structureType === "target" ? "TCP" : "NTCP"} models
                   </Text>
                   <Text className="text-xs" style={{ color: colors.muted }}>
-                    Same DVH and fractionation; selected model highlighted. Compare before choosing export model.
+                    Tap a model to select it for this structure and composite plan driving.
                   </Text>
                   {modelRows.map((row) => (
-                    <View key={row.model} className="flex-row justify-between">
-                      <Text
-                        className="text-sm"
-                        style={{
-                          color: row.isSelected ? colors.primary : colors.muted,
-                          fontWeight: row.isSelected ? "700" : "400",
-                        }}
-                      >
-                        {row.label}
-                      </Text>
-                      <Text
-                        className="text-sm font-mono"
-                        style={{
-                          color: row.isSelected ? colors.primary : colors.foreground,
-                          fontWeight: row.isSelected ? "700" : "400",
-                        }}
-                      >
-                        {row.valuePct.toFixed(1)}%
-                      </Text>
-                    </View>
+                    <Pressable
+                      key={row.model}
+                      onPress={() => selectDriveModel(row.model)}
+                      style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
+                    >
+                      <View className="flex-row justify-between py-1">
+                        <Text
+                          className="text-sm"
+                          style={{
+                            color: row.isSelected ? colors.primary : colors.muted,
+                            fontWeight: row.isSelected ? "700" : "400",
+                          }}
+                        >
+                          {row.label}
+                        </Text>
+                        <Text
+                          className="text-sm font-mono"
+                          style={{
+                            color: row.isSelected ? colors.primary : colors.foreground,
+                            fontWeight: row.isSelected ? "700" : "400",
+                          }}
+                        >
+                          {row.valuePct.toFixed(1)}%
+                        </Text>
+                      </View>
+                    </Pressable>
                   ))}
                 </View>
               )}
@@ -1046,7 +1080,9 @@ export default function CalculationResultsScreen() {
                   organ,
                   structureName,
                   structureType,
-                  model,
+                  model: activeModel,
+                  tcpModel: compositeTcpModel,
+                  ntcpModel: compositeNtcpModel,
                   cancerSite,
                   technique,
                   totalDose: String(totalDose),
@@ -1167,6 +1203,18 @@ export default function CalculationResultsScreen() {
                       technique,
                       prescriptionGy,
                       fileHint: (params.fileName as string) || planLabel || "",
+                      tcpModel: compositeTcpModel as
+                        | "lkb_loglogit"
+                        | "lkb_probit"
+                        | "poisson"
+                        | "zaider_minerbo"
+                        | "poisson_dvh",
+                      ntcpModel: compositeNtcpModel as
+                        | "lkb_loglogit"
+                        | "lkb_probit"
+                        | "poisson"
+                        | "zaider_minerbo"
+                        | "poisson_dvh",
                     });
                   } else {
                     const evalRes = await evaluatePlanMutation.mutateAsync({
@@ -1176,13 +1224,13 @@ export default function CalculationResultsScreen() {
                       cancerSite,
                       technique,
                       prescriptionGy,
-                      tcpModel: defaultCompositeTcpModel(cancerSite) as
+                      tcpModel: compositeTcpModel as
                         | "lkb_loglogit"
                         | "lkb_probit"
                         | "poisson"
                         | "zaider_minerbo"
                         | "poisson_dvh",
-                      ntcpModel: defaultCompositeNtcpModel() as
+                      ntcpModel: compositeNtcpModel as
                         | "lkb_loglogit"
                         | "lkb_probit"
                         | "poisson"
