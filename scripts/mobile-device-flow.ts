@@ -14,6 +14,7 @@ import {
   runAdb,
   scrollDown,
   scrollToBottom,
+  scrollToTop,
   sleep,
   tapFileInList,
   tapTextWithScroll,
@@ -135,19 +136,24 @@ export function runPatientDeviceFlow(opts: {
     rows.push({ step: "push_all_inputs", status: "SKIP", detail: "use pushAllInputsToDownloads before loop" });
   }
 
-  isolateCaseOnDevice(inputRoot, fileName, clinicalXlsx);
+  isolateCaseOnDevice(dvhSrc, clinicalXlsx);
   rows.push({ step: "push_case_isolated", status: "PASS", detail: `${fileName} (+ xlsx) only` });
 
   launchApp();
   dismissOverlays(getXml);
+  sleep(1500);
   tapTextWithScroll(getXml, "Import plan DVH", 3) || tapTextWithScroll(getXml, "Import", 3);
   sleep(2000);
   dismissOverlays(getXml);
-  tapTextWithScroll(getXml, "Refresh Downloads list", 2) ||
-    tapTextWithScroll(getXml, "Refresh", 2);
-  sleep(3500);
+  scrollToTop(6);
+  for (let refresh = 0; refresh < 3; refresh++) {
+    tapTextWithScroll(getXml, "Refresh Downloads list", 2) ||
+      tapTextWithScroll(getXml, "Refresh", 2);
+    sleep(2500);
+    if (waitForFileInList(getXml, fileName, 15000)) break;
+  }
 
-  const listed = waitForFileInList(getXml, fileName, 90000);
+  const listed = waitForFileInList(getXml, fileName, 120000);
   rows.push({
     step: "file_listed",
     status: listed ? "PASS" : "FAIL",

@@ -5,8 +5,12 @@ import fs from "fs";
 import path from "path";
 import { loadClinicalBundleFromFile } from "../lib/clinical-xlsx-import.node";
 
-const defaultXlsx =
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\radbiocalc_input\\rbGyaX_mobile_app_input\\radiobiocalc_clinical_input.xlsx";
+const defaultXlsx = path.join(
+  process.cwd(),
+  "test-input",
+  "rbGyaX_mobile_app_input",
+  "radiobiocalc_clinical_input.xlsx",
+);
 
 const xlsxPath = process.env.CLINICAL_XLSX?.trim() || defaultXlsx;
 const outPath = path.join(process.cwd(), "assets", "clinical", "bundled-clinical-hn57.json");

@@ -160,7 +160,8 @@ export function grantAppPermissions(): void {
   }
 }
 
-export function triggerMediaScan(dir: string): void {
+export function triggerMediaScan(target: string): void {
+  const uri = target.startsWith("file://") ? target : `file://${target}`;
   runAdb(
     [
       "shell",
@@ -169,11 +170,16 @@ export function triggerMediaScan(dir: string): void {
       "-a",
       "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
       "-d",
-      `file://${dir}`,
+      uri,
     ],
     true,
   );
-  sleep(800);
+  sleep(600);
+}
+
+export function scrollToTop(steps = 8): void {
+  for (let i = 0; i < steps; i++) scrollUp();
+  sleep(500);
 }
 
 export function clearDownloadInput(): void {
@@ -183,22 +189,30 @@ export function clearDownloadInput(): void {
 
 /** Only one case + optional xlsx visible to the app (reliable automation taps). */
 export function isolateCaseOnDevice(
-  inputRoot: string,
-  fileName: string,
+  dvhFilePath: string,
   clinicalXlsx?: string,
 ): void {
+  const fileName = path.basename(dvhFilePath);
+  if (!fs.existsSync(dvhFilePath)) {
+    throw new Error(`DVH file not found: ${dvhFilePath}`);
+  }
   clearInbox();
   clearDownloadInput();
   grantAppPermissions();
-  runAdb(["push", path.join(inputRoot, fileName), `${INBOX}/${fileName}`], true);
-  runAdb(["push", path.join(inputRoot, fileName), `${DOWNLOAD_INPUT}${fileName}`], true);
+  runAdb(["push", dvhFilePath, `${INBOX}/${fileName}`], true);
+  runAdb(["push", dvhFilePath, `${DOWNLOAD_INPUT}${fileName}`], true);
+  triggerMediaScan(`${INBOX}/${fileName}`);
+  triggerMediaScan(`${DOWNLOAD_INPUT}${fileName}`);
   if (clinicalXlsx && fs.existsSync(clinicalXlsx)) {
     const xlsxName = path.basename(clinicalXlsx);
     runAdb(["push", clinicalXlsx, `${INBOX}/${xlsxName}`], true);
     runAdb(["push", clinicalXlsx, `${DOWNLOAD_INPUT}${xlsxName}`], true);
+    triggerMediaScan(`${INBOX}/${xlsxName}`);
+    triggerMediaScan(`${DOWNLOAD_INPUT}${xlsxName}`);
   }
   triggerMediaScan("/storage/emulated/0/Download/rbGyaX_mobile_app_input");
-  sleep(2500);
+  triggerMediaScan("/storage/emulated/0/Download");
+  sleep(4000);
 }
 
 export function clearInbox(): void {
