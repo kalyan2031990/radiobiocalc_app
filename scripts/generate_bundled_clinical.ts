@@ -6,9 +6,9 @@ import fs from "fs";
 import path from "path";
 import { loadClinicalBundles } from "../lib/clinical-xlsx-import.node";
 
-const root =
-  process.env.INPUT_FOLDERS?.trim() ||
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\radbiocalc_input";
+import { getRadbiocalcInputRoot } from "./test-data-root";
+
+const root = process.env.INPUT_FOLDERS?.trim() || getRadbiocalcInputRoot() || "";
 const clinicalDir = path.join(root, "clinical_input");
 const outPath = path.join(process.cwd(), "assets", "clinical", "bundled-clinical-hn57.json");
 

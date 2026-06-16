@@ -4,14 +4,10 @@ import path from "path";
 import { parseEclipseTxtNative } from "../lib/eclipse-dvh-native";
 import { getRadbiocalcInputRoot } from "../scripts/test-data-root";
 
-const FIXTURE =
-  process.platform === "win32"
-    ? path.join(
-        process.env.INPUT_FOLDERS ??
-          "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\radbiocalc_input",
-        "PTV_DVH_txt_data_14pt",
-      )
-    : "";
+const FIXTURE = (() => {
+  const root = process.env.INPUT_FOLDERS ?? getRadbiocalcInputRoot();
+  return root ? path.join(root, "PTV_DVH_txt_data_14pt") : "";
+})();
 
 describe("Eclipse txt parser characterization", () => {
   it("parses a real PTV fixture with Gy dose and structures", () => {

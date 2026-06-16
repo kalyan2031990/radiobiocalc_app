@@ -27,7 +27,7 @@ const MODELS: RadiobiologyModelId[] = [
 
 const OUT_DIR =
   process.env.AUDIT_OUT?.trim() ||
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\rbGyanX_mobile_paper\\radbiocalc_app_input_output\\rbGyanX_v1.0.0_validation_output";
+  path.join(process.cwd(), "test-output", "radiobiology-audit");
 
 function pct(v: number): string {
   return `${(v * 100).toFixed(1)}%`;
@@ -141,13 +141,13 @@ function main() {
     auditPrescriptionMismatch(root),
     "## Composite plan results (engine)",
     "",
-    "| Patient | TCP% | NTCP% | TWI% | TCI% | D95 | Dose | Fx |",
-    "|---------|-----:|------:|-----:|-----:|----:|-----:|---:|",
+    "| Patient | TCP disp% | TCP uncap% | NTCP% | UTCP% | P+% | TWI% | TCI% | D95 | Dose | Fx |",
+    "|---------|--------:|-----------:|------:|------:|----:|-----:|-----:|----:|-----:|---:|",
   ];
 
   for (const r of results) {
     lines.push(
-      `| ${r.patientId} | ${r.tcpPct.toFixed(1)} | ${r.ntcpPct.toFixed(1)} | ${r.twiPct.toFixed(1)} | ${r.tciPercent?.toFixed(1) ?? "—"} | ${r.d95Gy?.toFixed(1) ?? "—"} | ${r.doseUsedGy} | ${r.fractionsUsed} |`,
+      `| ${r.patientId} | ${r.tcpDisplayPct.toFixed(1)} | ${r.tcpUncappedPct.toFixed(1)} | ${r.ntcpPct.toFixed(1)} | ${r.utcpPct.toFixed(1)} | ${r.pplusPct.toFixed(1)} | ${r.twiPct.toFixed(1)} | ${r.tciPercent?.toFixed(1) ?? "—"} | ${r.d95Gy?.toFixed(1) ?? "—"} | ${r.doseUsedGy} | ${r.fractionsUsed} |`,
     );
   }
 
@@ -173,10 +173,26 @@ function main() {
 
   const outPath = path.join(OUT_DIR, "04_RADIOBIOLOGY_AUDIT.md");
   const auditCopy = path.join(OUT_DIR, "engine_results_audit.md");
+  const auditJson = path.join(OUT_DIR, "engine_results_audit.json");
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const body = lines.join("\n");
   fs.writeFileSync(outPath, body, "utf8");
   fs.writeFileSync(auditCopy, body, "utf8");
+  fs.writeFileSync(
+    auditJson,
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        inputRoot: root,
+        pass,
+        total: results.length,
+        cases: results,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
   console.log(`Wrote ${outPath}`);
   console.log(`Engine: ${pass}/${results.length} PASS`);
   if (pass < results.length) {

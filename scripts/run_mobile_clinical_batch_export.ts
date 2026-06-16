@@ -17,13 +17,15 @@ import {
   runAllMobileAppCases,
 } from "./mobile-app-input-suite-core";
 
-const DEFAULT_XLSX =
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\radbiocalc_input\\rbGyaX_mobile_app_input\\radiobiocalc_clinical_input.xlsx";
+const DEFAULT_XLSX = path.join(
+  getMobileAppInputRoot(),
+  "radiobiocalc_clinical_input.xlsx",
+);
 
 const CLINICAL_XLSX = process.env.CLINICAL_XLSX?.trim() || DEFAULT_XLSX;
 const LOCAL_OUT =
   process.env.PILOT_OUT_DIR?.trim() ||
-  "C:\\Users\\Sampa\\OneDrive\\Desktop\\rbGyanX_mobile_paper\\radbiocalc_app_input_output\\rbGyanX_v1.0.0_validation_output\\exported_pdfs_clinical";
+  path.join(process.cwd(), "test-output", "exported_pdfs_clinical");
 const DEVICE_EXPORT_DIR = "/sdcard/Download/rbGyaX_exported_reports_clinical/";
 
 type Row = {

@@ -49,7 +49,11 @@ export type EngineCaseResult = {
   structures: string[];
   therapeuticEligible: boolean;
   tcpPct: number;
+  tcpDisplayPct: number;
+  tcpUncappedPct: number;
   ntcpPct: number;
+  utcpPct: number;
+  pplusPct: number;
   twiPct: number;
   parserMaxDoseDeltaGy: number;
   mobileNativeStructures: number;
@@ -130,8 +134,7 @@ export function getMobileAppInputRoot(): string {
     if (fs.existsSync(nested)) return nested;
     return env;
   }
-  const fallback =
-    "C:\\Users\\Sampa\\OneDrive\\Desktop\\input_folders\\radbiocalc_input\\rbGyaX_mobile_app_input";
+  const fallback = path.join(process.cwd(), "test-input", "rbGyaX_mobile_app_input");
   if (fs.existsSync(fallback)) return fallback;
   throw new Error("Set INPUT_FOLDERS to rbGyaX_mobile_app_input directory");
 }
@@ -345,7 +348,11 @@ export function runEngineForMobileAppCase(
       structures: Object.keys(offline.dvhByStructure),
       therapeuticEligible: scope.therapeuticWindowEligible,
       tcpPct: composite.therapeutic.tcp * 100,
+      tcpDisplayPct: composite.therapeutic.tcp * 100,
+      tcpUncappedPct: composite.therapeutic.tcpRaw * 100,
       ntcpPct: composite.therapeutic.ntcpComposite * 100,
+      utcpPct: composite.therapeutic.utcp * 100,
+      pplusPct: composite.therapeutic.pPlus * 100,
       twiPct: composite.therapeutic.twi * 100,
       parserMaxDoseDeltaGy,
       mobileNativeStructures: native.structures.length,
@@ -364,7 +371,11 @@ export function runEngineForMobileAppCase(
       structures: [],
       therapeuticEligible: false,
       tcpPct: 0,
+      tcpDisplayPct: 0,
+      tcpUncappedPct: 0,
       ntcpPct: 0,
+      utcpPct: 0,
+      pplusPct: 0,
       twiPct: 0,
       parserMaxDoseDeltaGy: 0,
       mobileNativeStructures: 0,
