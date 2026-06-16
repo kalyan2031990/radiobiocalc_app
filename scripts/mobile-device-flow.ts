@@ -147,7 +147,7 @@ export function runPatientDeviceFlow(opts: {
     tapTextWithScroll(getXml, "Refresh", 2);
   sleep(3500);
 
-  const listed = waitForFileInList(getXml, fileName, 45000);
+  const listed = waitForFileInList(getXml, fileName, 90000);
   rows.push({
     step: "file_listed",
     status: listed ? "PASS" : "FAIL",

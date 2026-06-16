@@ -198,6 +198,7 @@ export function isolateCaseOnDevice(
     runAdb(["push", clinicalXlsx, `${DOWNLOAD_INPUT}${xlsxName}`], true);
   }
   triggerMediaScan("/storage/emulated/0/Download/rbGyaX_mobile_app_input");
+  sleep(2500);
 }
 
 export function clearInbox(): void {
