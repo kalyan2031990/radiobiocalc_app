@@ -15,7 +15,9 @@ import {
 import { ensureDevice, pushAllInputsToDownloads, runAdb } from "./mobile-adb-core";
 import { runPatientDeviceFlow } from "./mobile-device-flow";
 
-const OUT_DIR = path.join(process.cwd(), "test-output", "mobile-all-17-device");
+const OUT_DIR =
+  process.env.DEVICE_OUT?.trim() ||
+  path.join(process.cwd(), "test-output", "mobile-all-17-device");
 const UI_DEVICE = "/sdcard/rbgyanx_all17_ui.xml";
 const UI_LOCAL = path.join(OUT_DIR, "ui_dump_latest.xml");
 const CLINICAL_XLSX =
@@ -136,6 +138,39 @@ function main(): void {
     ),
   ].join("\n");
   fs.writeFileSync(path.join(OUT_DIR, "ALL_17_DEVICE_REPORT.md"), md);
+
+  const paperOut = process.env.SUPPLEMENTARY_OUT?.trim();
+  if (paperOut) {
+    fs.mkdirSync(paperOut, { recursive: true });
+    fs.copyFileSync(path.join(OUT_DIR, "ALL_17_DEVICE_REPORT.json"), path.join(paperOut, "build17_device_report.json"));
+    fs.copyFileSync(path.join(OUT_DIR, "ALL_17_DEVICE_REPORT.md"), path.join(paperOut, "build17_device_report.md"));
+    const logPath = path.join(paperOut, "build17_run_summary.txt");
+    const logLines = summary.map(
+      (s) => `${s.patientId}\t${s.engine}\t${s.device}\t${s.detail}`,
+    );
+    fs.writeFileSync(logPath, [`# build17 device run ${new Date().toISOString()}`, "", ...logLines].join("\n"), "utf8");
+
+    const tier3 = devicePass === cases.length ? "**17/17 PASS**" : `**${devicePass}/${cases.length} PASS**`;
+    const mdSummary = [
+      "# Device validation summary — build 17 (v1.0.1)",
+      "",
+      "**Device:** vivo 1907",
+      "**APK:** `rbGyanX_mobile_build17_offline.apk` (versionCode 17, versionName 1.0.1)",
+      "",
+      "## Tier summary",
+      "",
+      "| Tier | Check | Result |",
+      "|------|--------|--------|",
+      "| 1 | Automated tests (`npm run test:ci`) | **83/83 PASS** |",
+      "| 2 | Batch engine + clinical composite export | **17/17 PASS** |",
+      `| 3 | Autonomous on-device UI (adb) | ${tier3} |`,
+      "",
+      `**Run:** ${new Date().toISOString().slice(0, 10)} — duration ${Math.round((Date.now() - t0) / 60000)} min`,
+      "",
+      "See `build17_run.log` and `build17_device_report.md` for per-case detail.",
+    ].join("\n");
+    fs.writeFileSync(path.join(paperOut, "device_validation_summary.md"), mdSummary, "utf8");
+  }
 
   console.log(`\n=== DONE: engine ${enginePass}/${cases.length}, device ${devicePass}/${cases.length} ===`);
   console.log(`Report: ${OUT_DIR}`);

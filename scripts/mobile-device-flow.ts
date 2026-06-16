@@ -21,6 +21,7 @@ import {
   uiDump,
   waitForTextWithScroll,
 } from "./mobile-adb-core";
+import { resolveCompositeDvhDir } from "./mobile-app-input-suite-core";
 
 export type DeviceFlowRow = { step: string; status: "PASS" | "FAIL" | "SKIP"; detail: string };
 
@@ -73,7 +74,7 @@ function pullLatestInAppPdf(localPath: string): string | null {
   return fs.existsSync(localPath) ? localPath : null;
 }
 
-function waitForCalculationComplete(getXml: () => string, timeoutMs = 360000): boolean {
+export function waitForCalculationComplete(getXml: () => string, timeoutMs = 360000): boolean {
   const needles = [
     "export report",
     "therapeutic window",
@@ -121,12 +122,13 @@ export function runPatientDeviceFlow(opts: {
   const rows: DeviceFlowRow[] = [];
   const getXml = () => uiDump(uiDevicePath, uiLocalPath);
 
+  const dvhDir = resolveCompositeDvhDir(inputRoot);
   const fileName =
     fs
-      .readdirSync(inputRoot)
+      .readdirSync(dvhDir)
       .find((f) => f.toUpperCase().startsWith(patientId.toUpperCase()) && /composite/i.test(f)) ??
     `${patientId}_composite_DVH.txt`;
-  const dvhSrc = path.join(inputRoot, fileName);
+  const dvhSrc = path.join(dvhDir, fileName);
   if (!fs.existsSync(dvhSrc)) {
     rows.push({ step: "input_file", status: "FAIL", detail: `Missing ${fileName}` });
     return { ok: false, rows };

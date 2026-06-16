@@ -4,6 +4,7 @@
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
+import { resolveCompositeDvhDir } from "./mobile-app-input-suite-core";
 
 export const PKG = "com.rbgyanx.radiobiocalc";
 export const INBOX = `/sdcard/Android/data/${PKG}/files/rbgyanx_inbox`;
@@ -220,15 +221,18 @@ export function clearInbox(): void {
   runAdb(["shell", "mkdir", "-p", INBOX], true);
 }
 
-/** Push all files to Downloads subfolder (visible in Files app). */
+/** Push all DVH + clinical xlsx to Downloads subfolder (visible in Files app). */
 export function pushAllInputsToDownloads(inputRoot: string): number {
-  const files = fs
-    .readdirSync(inputRoot)
-    .filter((n) => /\.(txt|xlsx)$/i.test(n))
-    .sort();
+  const dvhDir = resolveCompositeDvhDir(inputRoot);
+  const dvhs = fs.readdirSync(dvhDir).filter((n) => /\.txt$/i.test(n));
+  const xlsx = fs.readdirSync(inputRoot).filter((n) => /\.xlsx$/i.test(n));
+  const files = [...dvhs, ...xlsx].sort();
   runAdb(["shell", "mkdir", "-p", DOWNLOAD_INPUT], true);
   grantAppPermissions();
-  for (const name of files) {
+  for (const name of dvhs) {
+    runAdb(["push", path.join(dvhDir, name), `${DOWNLOAD_INPUT}${name}`], true);
+  }
+  for (const name of xlsx) {
     runAdb(["push", path.join(inputRoot, name), `${DOWNLOAD_INPUT}${name}`], true);
   }
   triggerMediaScan("/storage/emulated/0/Download/rbGyaX_mobile_app_input");
@@ -237,14 +241,19 @@ export function pushAllInputsToDownloads(inputRoot: string): number {
 
 /** Push all composite DVH + clinical xlsx to app inbox and Downloads subfolder. */
 export function pushMobileAppInputsToDevice(inputRoot: string): { pushed: number; files: string[] } {
-  const files = fs
-    .readdirSync(inputRoot)
-    .filter((n) => /\.(txt|xlsx)$/i.test(n))
-    .sort();
+  const dvhDir = resolveCompositeDvhDir(inputRoot);
+  const dvhs = fs.readdirSync(dvhDir).filter((n) => /\.txt$/i.test(n));
+  const xlsx = fs.readdirSync(inputRoot).filter((n) => /\.xlsx$/i.test(n));
+  const files = [...dvhs, ...xlsx].sort();
   runAdb(["shell", "mkdir", "-p", INBOX], true);
   runAdb(["shell", "mkdir", "-p", DOWNLOAD_INPUT], true);
   grantAppPermissions();
-  for (const name of files) {
+  for (const name of dvhs) {
+    const src = path.join(dvhDir, name);
+    runAdb(["push", src, `${INBOX}/${name}`], true);
+    runAdb(["push", src, `${DOWNLOAD_INPUT}${name}`], true);
+  }
+  for (const name of xlsx) {
     const src = path.join(inputRoot, name);
     runAdb(["push", src, `${INBOX}/${name}`], true);
     runAdb(["push", src, `${DOWNLOAD_INPUT}${name}`], true);
