@@ -1,7 +1,7 @@
 # CHANGELOG — v1.1.0 (build 18)
 
 **Release:** 1.1.0 · `versionCode` 18  
-**Branch:** `v1.1.0`  
+**Branch:** `main` (merged)  
 **Base:** v1.0.1-build17 — single-plan engine outputs unchanged (regression guard on 17 composite DVHs).
 
 ## Added

@@ -2,8 +2,8 @@
 
 **Product:** Medical / scientific software for radiobiological plan evaluation (TCP, NTCP, DVH metrics).  
 **Stack:** React Native (Expo) + TypeScript; offline on-device engine.  
-**Current version:** **1.0.0** (build **15**) — see `app.config.ts`, `lib/app-meta.ts`  
-**GitHub:** https://github.com/kalyan2031990/radiobiocalc_app (tag `v1.0.0`)
+**Current version:** **1.1.0** (build **18**) — see `app.config.ts`, `lib/app-meta.ts`  
+**GitHub:** https://github.com/kalyan2031990/radiobiocalc_app (tag `v1.1.0-build18`)
 
 **Positioning (pre-regulatory clearance):**
 
@@ -12,15 +12,14 @@
 
 ---
 
-## Validation status (2026-06-13)
+## Validation status (2026-06-25, build 18)
 
 | Gate | Result |
 |------|--------|
+| `npm run test:ci` | **95/95 PASS** |
 | Engine 17 composite DVHs | **17/17 PASS** |
-| Report export + therapeutic-window chart | **PASS** |
-| Clinical batch PDF (all patients) | **17/17 PASS** |
-| Device DVH import smoke | **PASS** |
-| Full UI smoke (calc results) | **FAIL** (timeout; non-blocking for batch export) |
+| Six-metric independent parity | Unchanged from build 17 |
+| Clinical HTML export (17 cases) | **17/17 PASS** |
 
 Full methods and PDF archive: see `docs/validation/` and local Desktop package `rbGyanX_v1.0.0_validation_output`.
 
