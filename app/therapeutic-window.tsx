@@ -9,9 +9,12 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { MaterialIcons } from "@expo/vector-icons";
 import { TherapeuticWindowChart } from "@/components/therapeutic-window-chart";
+import { TherapeuticSweepChart } from "@/components/therapeutic-sweep-chart";
 import { TcpModelCaution } from "@/components/tcp-model-caution";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { loadPlanEvalSession } from "@/lib/plan-eval-session";
+import { loadDvhSession } from "@/lib/dvh-session";
+import { therapeuticWindowDoseSweep } from "@/lib/dose-sweep";
 import type { CompositePlanEvaluation } from "@/lib/composite-plan-types";
 import { capTcpForDisplay, formatTcpPercent } from "@/lib/tcp-display";
 
@@ -24,9 +27,12 @@ export default function TherapeuticWindowScreen() {
   const colors = useColors();
   const params = useLocalSearchParams();
   const planEvalSessionId = params.planEvalSessionId as string | undefined;
+  const dvhSessionId = params.dvhSessionId as string | undefined;
+  const numFractionsParam = parseInt((params.numFractions as string) || "35", 10);
 
   const [evalData, setEvalData] = useState<CompositePlanEvaluation | null>(null);
   const [loading, setLoading] = useState(!!planEvalSessionId);
+  const [sweepBundle, setSweepBundle] = useState<import("@/lib/dvh-bundle-types").ParsedDvhBundle | null>(null);
 
   useEffect(() => {
     if (!planEvalSessionId) {
@@ -38,6 +44,21 @@ export default function TherapeuticWindowScreen() {
       setLoading(false);
     });
   }, [planEvalSessionId]);
+
+  useEffect(() => {
+    if (!dvhSessionId) return;
+    loadDvhSession(dvhSessionId).then(setSweepBundle);
+  }, [dvhSessionId]);
+
+  const sweep = useMemo(() => {
+    if (!sweepBundle || !evalData) return null;
+    return therapeuticWindowDoseSweep({
+      bundle: sweepBundle,
+      baseTotalDoseGy: evalData.totalDose,
+      numFractions: evalData.numFractions || numFractionsParam,
+      prescriptionGy: evalData.prescriptionGy,
+    });
+  }, [sweepBundle, evalData, numFractionsParam]);
 
   const tw = evalData?.therapeutic;
   const dose = evalData?.totalDose ?? parseFloat((params.totalDose as string) || "70");
@@ -85,6 +106,20 @@ export default function TherapeuticWindowScreen() {
           <View className="rounded-xl overflow-hidden" style={{ backgroundColor: colors.surface }}>
             <TherapeuticWindowChart tcp={tcp} ntcp={ntcp} dose={dose} />
           </View>
+
+          {sweep && (
+            <View className="gap-2">
+              <Text className="font-semibold" style={{ color: colors.foreground }}>
+                Dose sweep (20–100 Gy)
+              </Text>
+              <TherapeuticSweepChart
+                points={sweep.points}
+                optimalDoseGy={sweep.optimalDoseGy}
+                optimalUtcp={sweep.optimalUtcp}
+                currentDoseGy={dose}
+              />
+            </View>
+          )}
 
           {(tw || showTcpCaution) && (
             <TcpModelCaution showCapFootnote={!!tw?.tcpCapped} />

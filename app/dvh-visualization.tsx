@@ -14,6 +14,7 @@ import { loadDvhSession } from "@/lib/dvh-session";
 import { structureKeys, type ParsedDvhBundle } from "@/lib/plan-evaluation";
 import { inferEvaluationRole } from "@/lib/structure-role";
 import { arrayMax, arrayMin } from "@/lib/numeric-safe";
+import { getPrescriptionFromBundle } from "@/lib/dvh-prescription";
 
 type StructureRow = {
   name: string;
@@ -126,6 +127,23 @@ export default function DVHVisualizationScreen() {
   }
 
   const active = selected ?? structures[0];
+  const [evalGeud, setEvalGeud] = useState<number | undefined>();
+
+  useEffect(() => {
+    if (!bundle || !active) return;
+    void (async () => {
+      const rx = getPrescriptionFromBundle(bundle);
+      const { offlineEvaluateComposite } = await import("@/lib/offline-engine");
+      const ev = offlineEvaluateComposite(bundle, {
+        totalDose: rx.prescribedDoseGy ?? 70,
+        numFractions: rx.prescribedFractions ?? 35,
+        prescriptionGy: rx.prescribedDoseGy,
+        fileHint: fileName,
+      });
+      const sr = ev.structureResults.find((s) => s.structureName === active.name);
+      setEvalGeud(sr?.doseMetrics.gEUD);
+    })();
+  }, [bundle, active?.name, fileName]);
 
   return (
     <ScreenContainer className="bg-background">
@@ -159,9 +177,14 @@ export default function DVHVisualizationScreen() {
           </Pressable>
         ))}
 
-        <View style={{ height: 280, backgroundColor: colors.surface, borderRadius: 12 }}>
-          <DVHChart data={active.points} />
-        </View>
+        <DVHChart
+          dvhData={active.points}
+          structureName={active.name}
+          structureType={active.type}
+          maxDose={active.maxDose}
+          meanDose={active.meanDose}
+          geud={evalGeud}
+        />
       </ScrollView>
     </ScreenContainer>
   );

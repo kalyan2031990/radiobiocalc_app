@@ -1,5 +1,5 @@
 /**
- * Dose-Response — model curve from literature parameters used in calculation.
+ * Dose-response screen — curves, CI bands, operating point (F3).
  */
 
 import { ScrollView, Text, View, Pressable } from "react-native";
@@ -8,6 +8,8 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { MaterialIcons } from "@expo/vector-icons";
 import { DoseResponseChart } from "@/components/dose-response-chart";
+import { buildCiSensitivityBand, hasPublishedCi } from "@/lib/dose-sweep";
+import { provenanceForStructure } from "@/lib/citation-report";
 
 export default function DoseResponseScreen() {
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function DoseResponseScreen() {
   const probability = parseFloat((params.probability as string) || "0");
   const td50 = parseFloat((params.td50 as string) || "28");
   const gamma50 = parseFloat((params.gamma50 as string) || "1");
+  const m = parseFloat((params.m as string) || "0.18");
   const geud = parseFloat((params.geud as string) || String(totalDose));
   const isTcp = structureType === "target";
 
@@ -28,6 +31,20 @@ export default function DoseResponseScreen() {
     model === "lkb_probit" || model === "poisson"
       ? (model as "lkb_probit" | "poisson")
       : "lkb_loglogit";
+
+  const ciBand =
+    !isTcp && hasPublishedCi(organ, model)
+      ? buildCiSensitivityBand({
+          organ,
+          model: modelKey,
+          td50,
+          gamma50,
+          m,
+          doseMax: Math.max(totalDose * 1.2, td50 * 2, 80),
+        })
+      : null;
+
+  const prov = provenanceForStructure(organ, model);
 
   return (
     <ScreenContainer className="bg-background">
@@ -45,9 +62,6 @@ export default function DoseResponseScreen() {
             <Text className="text-sm" style={{ color: colors.muted }}>
               {isTcp ? "TCP" : "NTCP"} · {organ} · {model.replace(/_/g, " ")}
             </Text>
-            <Text className="text-xs" style={{ color: colors.muted }}>
-              Curve uses literature TD50/D50 and γ from your calculation; marker at plan gEUD/mean dose.
-            </Text>
           </View>
 
           <View className="rounded-xl overflow-hidden" style={{ backgroundColor: colors.surface }}>
@@ -56,23 +70,30 @@ export default function DoseResponseScreen() {
               dose={geud}
               td50={td50}
               gamma50={gamma50}
+              m={m}
               model={modelKey}
               isTCP={isTcp}
               doseMax={Math.max(totalDose * 1.2, td50 * 2, 80)}
+              ciBand={ciBand ?? undefined}
             />
           </View>
 
-          <View className="rounded-lg p-4 gap-2" style={{ backgroundColor: colors.surface }}>
-            <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
-              Plan point
+          {ciBand && (
+            <Text style={{ fontSize: 12, color: colors.muted }}>
+              Shaded band: NTCP at published 95% CI limits on TD50/m (QUANTEC) — not extrapolated.
             </Text>
-            <Text style={{ color: colors.muted }}>
-              Dose metric: {geud.toFixed(1)} Gy · {isTcp ? "TCP" : "NTCP"}: {(probability * 100).toFixed(1)}%
-            </Text>
-            <Text style={{ color: colors.muted }}>
-              TD50/D50: {td50.toFixed(1)} Gy · γ50/γ: {gamma50.toFixed(2)}
-            </Text>
-          </View>
+          )}
+
+          {prov && (
+            <View className="rounded-lg p-4 gap-1" style={{ backgroundColor: colors.surface }}>
+              <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
+                Parameter provenance
+              </Text>
+              <Text style={{ color: colors.muted, fontSize: 12 }}>
+                {prov.citation.authors} ({prov.citation.year}). TD50 {prov.parameters.td50?.toFixed(1)} Gy.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </ScreenContainer>

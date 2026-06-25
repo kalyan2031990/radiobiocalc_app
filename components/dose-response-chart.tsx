@@ -18,9 +18,11 @@ interface DoseResponseChartProps {
   dose: number;
   td50: number;
   gamma50: number;
+  m?: number;
   model: "lkb_loglogit" | "lkb_probit" | "poisson";
   isTCP: boolean;
   doseMax?: number;
+  ciBand?: Array<{ dose: number; low: number; high: number }>;
 }
 
 function erf(x: number): number {
@@ -64,9 +66,11 @@ export function DoseResponseChart({
   dose,
   td50,
   gamma50,
+  m = 0.18,
   model,
   isTCP,
   doseMax = 80,
+  ciBand,
 }: DoseResponseChartProps) {
   const colors = useColors();
   const width = Dimensions.get("window").width - 48;
@@ -145,6 +149,31 @@ export function DoseResponseChart({
           strokeWidth={3}
           fill="none"
         />
+        {ciBand && ciBand.length > 1 && (
+          <Path
+            d={
+              ciBand
+                .map((p, i) => {
+                  const x = padding + (p.dose / range) * (width - 2 * padding);
+                  const y = height - padding - p.high * (height - 2 * padding);
+                  return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+                })
+                .join(" ") +
+              " " +
+              [...ciBand]
+                .reverse()
+                .map((p) => {
+                  const x = padding + (p.dose / range) * (width - 2 * padding);
+                  const y = height - padding - p.low * (height - 2 * padding);
+                  return `L ${x} ${y}`;
+                })
+                .join(" ") +
+              " Z"
+            }
+            fill={colors.error + "30"}
+            stroke="none"
+          />
+        )}
         <Circle
           cx={currentX}
           cy={currentY}

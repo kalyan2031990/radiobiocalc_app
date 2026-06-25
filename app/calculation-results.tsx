@@ -1252,6 +1252,8 @@ export default function CalculationResultsScreen() {
                     params: {
                       planEvalSessionId,
                       totalDose: String(totalDose),
+                      dvhSessionId: dvhSessionId ?? "",
+                      numFractions: String(numFractions),
                     },
                   });
                 } catch (e) {
