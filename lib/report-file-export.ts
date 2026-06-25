@@ -183,3 +183,25 @@ export function notifyReportSaved(file: SavedReportFile, kind: string): void {
     ],
   );
 }
+
+/** Save HTML report as PDF (expo-print on native; print dialog on web). */
+export async function saveReportPdf(filename: string, html: string): Promise<SavedReportFile> {
+  if (Platform.OS === "web") {
+    const printed = printHtmlReportWeb(html);
+    if (!printed) {
+      return saveTextReport(filename.replace(/\.pdf$/, ".html"), html);
+    }
+    return { uri: "", filename };
+  }
+  const Print = await import("expo-print");
+  const { uri: tempUri } = await Print.printToFileAsync({ html });
+  return persistReportFile(tempUri, filename);
+}
+
+export async function saveReportDocx(filename: string, docxBase64: string): Promise<SavedReportFile> {
+  return saveBytesReport(filename, docxBase64);
+}
+
+export async function saveReportCsv(filename: string, csv: string): Promise<SavedReportFile> {
+  return saveTextReport(filename, csv);
+}

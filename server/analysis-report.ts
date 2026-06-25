@@ -11,6 +11,11 @@ import {
   type ClinicalReportSection,
 } from "../lib/clinical-report-sections";
 import { chartDocxSummaryLines } from "../lib/enrich-report-charts";
+import {
+  buildCitationReportItems,
+  citationReportHtmlSection,
+  citationReportTextSection,
+} from "../lib/citation-report";
 
 export type AnalysisReportInput = {
   patientId: string;
@@ -114,6 +119,19 @@ export function buildAnalysisReport(input: AnalysisReportInput): AnalysisReportO
     .map((r) => `<li>${escapeHtml(r.citation)}</li>`)
     .join("");
 
+  const compositeCiteItems =
+    input.isCompositePlan && input.compositeStructures?.length
+      ? buildCitationReportItems(
+          input.compositeStructures.map((s) => ({
+            organ: s.organ,
+            model: s.model,
+            structureName: s.structureName,
+          })),
+        )
+      : buildCitationReportItems([{ organ: input.organ, model: input.model, structureName: input.structureName }]);
+  const paramsRefsHtml = citationReportHtmlSection(compositeCiteItems);
+  const paramsRefsDocx = citationReportTextSection(compositeCiteItems);
+
   const includeClinical = input.includeClinicalInReport === true;
   const clinicalHtml = includeClinical
     ? formatClinicalHtml(
@@ -168,7 +186,8 @@ ${compositeHtml}
 ${formatAbbreviationsHtml(input)}
 ${clinicalHtml}
 ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitation)}</p>` : ""}
-<h2>References</h2><ul>${refs}</ul>
+${paramsRefsHtml}
+<h2>Model references</h2><ul>${refs}</ul>
 <p class="disclaimer">Research and educational tool only — not for primary clinical decisions. Verify against institutional protocols.</p>
 </body></html>`;
 
@@ -204,7 +223,8 @@ ${prov?.organCitation ? `<h2>Organ guideline</h2><p>${escapeHtml(prov.organCitat
     ...(compositeDocx.length ? [""] : []),
     ...clinicalDocx,
     ...(clinicalDocx.length ? [""] : []),
-    "References:",
+    paramsRefsDocx,
+    "Model references:",
     ...(prov?.references ?? []).map((r) => `  - ${r.citation}`),
     "",
     "Disclaimer: Research/educational use only.",

@@ -43,6 +43,7 @@
     "test:single-clinical-report": "tsx scripts/run_single_clinical_report_check.ts",
     "test:mobile-clinical-device-smoke": "tsx scripts/run_mobile_clinical_device_smoke.ts",
     "test:mobile-all-17-device": "tsx scripts/run_mobile_all_17_device.ts",
+    "capture:fig2-build17": "tsx scripts/run_build17_fig2_screenshots.ts",
     "test:mobile-full-fresh-export": "tsx scripts/run_mobile_full_fresh_export.ts",
     "test:manuscript-export": "tsx scripts/run_manuscript_export.ts",
     "generate:bundled-clinical": "tsx scripts/generate_bundled_clinical.ts",

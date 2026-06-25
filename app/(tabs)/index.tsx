@@ -221,6 +221,54 @@ export default function HomeScreen() {
               </View>
             </Pressable>
 
+            <Pressable
+              onPress={() => router.push("/plan-compare")}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            >
+              <View
+                className="rounded-xl p-4 flex-row items-center justify-between"
+                style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+              >
+                <View className="flex-row items-center gap-2 flex-1">
+                  <MaterialIcons name="compare-arrows" size={22} color={colors.primary} />
+                  <Text style={{ color: colors.foreground, fontWeight: "600" }}>Plan A / B compare</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
+              </View>
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push("/parameter-library")}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            >
+              <View
+                className="rounded-xl p-4 flex-row items-center justify-between"
+                style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+              >
+                <View className="flex-row items-center gap-2 flex-1">
+                  <MaterialIcons name="menu-book" size={22} color={colors.primary} />
+                  <Text style={{ color: colors.foreground, fontWeight: "600" }}>Parameter library</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
+              </View>
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push("/fractionation-table")}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            >
+              <View
+                className="rounded-xl p-4 flex-row items-center justify-between"
+                style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+              >
+                <View className="flex-row items-center gap-2 flex-1">
+                  <MaterialIcons name="table-chart" size={22} color={colors.primary} />
+                  <Text style={{ color: colors.foreground, fontWeight: "600" }}>BED / EQD₂ table</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
+              </View>
+            </Pressable>
+
             <View
               className="rounded-xl p-4 gap-1"
               style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
