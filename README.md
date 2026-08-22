@@ -7,7 +7,7 @@
 
 | | |
 |---|---|
-| **Current release** | **v1.1.0** (build 18) |
+| **Current release** | **v1.2.0** (build 19) |
 | **Package** | `com.rbgyanx.radiobiocalc` |
 | **Stack** | Expo · React Native · TypeScript |
 | **Engine** | On-device (no network required) |
@@ -16,16 +16,20 @@
 
 ---
 
-## Features (v1.1.0)
+## Features (v1.2.0)
 
 - Single-plan composite evaluation (17-case validated cohort)
 - **Plan A/B compare** with Δ metrics and DVH overlay
 - DVH curves with **gEUD** marker; dose–response with published CI bands where available
 - **Parameter library** (QUANTEC-oriented, citation-linked)
-- **BED / EQD₂** fractionation-equivalence table (LQL optional)
+- **BED / EQD₂** fractionation-equivalence table (LQL optional, LQL-consistent EQD₂)
 - PDF / DOCX export with per-calculation references
+- **v1.2.0:** scientific hardening release — corrected generic Poisson TCP/NTCP
+  parameterizations, cumulative-convention Dxx on all paths, gEUD-based EUD,
+  prescription-referenced target coverage indices, 23-test property/metamorphic
+  suite and a 9-check regression gate against the frozen build-18 record
 
-See [CHANGELOG_v1.1.0.md](CHANGELOG_v1.1.0.md) and [docs/RELEASE_v1.1.0-build18.md](docs/RELEASE_v1.1.0-build18.md).
+See [CHANGELOG_v1.2.0.md](CHANGELOG_v1.2.0.md), [CHANGELOG_v1.1.0.md](CHANGELOG_v1.1.0.md) and [docs/RELEASE_v1.1.0-build18.md](docs/RELEASE_v1.1.0-build18.md).
 
 ---
 
@@ -49,14 +53,16 @@ npm run build:android:release
 
 ## Validation
 
-| Gate | Result (build 18) |
+| Gate | Result (build 19) |
 |------|-------------------|
-| `npm run test:ci` | 95/95 PASS |
-| Engine audit (17 composite DVHs) | 17/17 PASS |
-| Independent six-metric parity | Unchanged from build 17 |
+| `npm run test:ci` | 118/118 PASS (incl. 23 property/metamorphic tests) |
+| v1.2.0 regression gate (`scripts/run_v120_regression.ts`) | 9/9 PASS |
+| Engine audit (17 composite DVHs, build 18) | 17/17 PASS |
+| Default-path composite metrics | Unchanged from build 18 |
 
 ```bash
 INPUT_FOLDERS=<path-to-composite-dvh-input> npx tsx scripts/audit_radiobiology_full.ts
+npx tsx scripts/run_v120_regression.ts   # bundled-sample regression gate
 ```
 
 Full program: [docs/VALIDATION_AND_RELEASE.md](docs/VALIDATION_AND_RELEASE.md)

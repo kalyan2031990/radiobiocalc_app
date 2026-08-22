@@ -1,0 +1,28 @@
+=== offline engine self-test ===
+PASS offline engine: TCP 95% · UTCP 9%
+
+=== dvh parse test ===
+OK RBX-TXT-001_composite_DVH.txt: PTV 66, LARYNX, Parotid, Spinal Cord (800 pts)
+MERGE OK: 4 structures, therapeutic=true, json=40.4 KB
+OK RBX-TXT-001_composite_DVH.txt: PTV 66, LARYNX, Parotid, Spinal Cord (800 pts)
+SKIP Legacy 3-file pick: legacy files not present on this machine
+All DVH parse tests passed.
+
+=== report export test ===
+PASS report export: rbGyanX_SYN-001_composite docx bytes 6340
+
+=== phi check ===
+PASS: no PHI console.log patterns
+
+=== v1.2.0 regression ===
+PASS  R1  Composite NTCP vs build-18 parity record  value=62.67  ref=62.7 ±0.5
+PASS  R2  TWI = uncapped TCP − Σλ·NTCP identity; post-build-17 value 40.0  value=40  ref=40 ±0.01
+PASS  R3  D95 vs build-18 parity record  value=65.23  ref=65.4 ±0.5
+PASS  S1a  Generic Poisson TCP(TCD50) = 0.5  value=0.5  ref=0.5 ±0.000001
+PASS  S1b  Generic Poisson TCP monotone increasing (10 Gy < 100 Gy)  value=0.0009 < 0.9620
+PASS  S2a  Generic Poisson NTCP(D50) = 0.5 (ln2-normalized)  value=0.5  ref=0.5 ±0.000001
+PASS  S4a  Differential-path D50 (cumulative interpolation)  value=50  ref=50 ±0.000001
+PASS  S5a  OAR V95/V100/V107 suppressed  value=undefined/undefined/undefined
+PASS  S3a  EUD equals gEUD (organ volume parameter)  value=15  ref=15 ±1e-9
+
+ALL CHECKS PASSED (9/9) — artifact: verification/v1.2.0/v120_regression_results.json

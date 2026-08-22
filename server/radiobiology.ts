@@ -260,20 +260,21 @@ export function calculateGEUD(
 }
 
 /**
- * Calculate Equivalent Uniform Dose (EUD)
- * Simplified version using mean dose and volume effect
+ * Calculate Equivalent Uniform Dose (EUD).
+ *
+ * v1.2.0 fix (S3): EUD is Niemierko's generalized EUD over the differential
+ * DVH — identical to gEUD with the organ volume parameter `a`.
+ * The previous `meanDose * totalVolume^(-v)` form was dimensionally incorrect
+ * (unit-dependent, and a uniform-dose volume did not return that dose) and
+ * has been removed.
+ *
+ * Reference: Niemierko A. Med Phys. 1997;24(1):103-110.
  */
 export function calculateEUD(
-  meanDose: number,
-  totalVolume: number,
-  volumeParameter: number = 1
+  dvh: DVHPoint[],
+  aParameter: number = 1
 ): number {
-  if (meanDose <= 0 || totalVolume <= 0) {
-    return 0;
-  }
-
-  // EUD ≈ mean dose adjusted for volume
-  return meanDose * Math.pow(totalVolume, -volumeParameter);
+  return calculateGEUD(dvh, aParameter);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -331,21 +332,29 @@ export function calculateDoseMetrics(dvh: DVHPoint[]): DoseMetrics {
   }
 
   // Calculate Dxx (dose to xx% of volume)
+  // v1.2.0 fix (S4): interpolate against the CUMULATIVE volume-receiving->=dose
+  // curve, not the differential bin fractions (the previous implementation used
+  // non-monotonic bin fractions as the interpolation axis and returned invalid
+  // Dxx values on the differential-DVH path).
+  const cumFrac = new Array<number>(sortedDVH.length);
+  let acc = 0;
+  for (let i = sortedDVH.length - 1; i >= 0; i--) {
+    acc += relativeVolumes[i];
+    cumFrac[i] = acc; // fraction of volume receiving dose >= doses[i]
+  }
   const dxx: Record<number, number> = {};
   const volumePercentages = [0.01, 0.1, 1, 2, 5, 10, 20, 30, 50, 70, 90, 95, 98];
   for (const volPercent of volumePercentages) {
-    const targetVolFraction = volPercent / 100;
-    if (targetVolFraction <= 1.0) {
-      // Reverse interpolation: find dose at given volume
-      const reversedDoses = [...doses].reverse();
-      const reversedVolumes = [...relativeVolumes].reverse();
-      const doseAtVolume = interpolate(reversedVolumes, reversedDoses, targetVolFraction);
-      dxx[volPercent] = doseAtVolume;
+    const f = volPercent / 100;
+    if (f <= 1.0) {
+      dxx[volPercent] = doseAtCumulativeFraction(doses, cumFrac, f);
     }
   }
 
   const gEUD = calculateGEUD(sortedDVH, 1); // a=1 for mean dose
-  const eud = calculateEUD(meanDose, totalVolume, 0.1);
+  // v1.2.0 fix (S3): EUD defaults to the a=1 gEUD here; performCalculation
+  // overrides it with the organ-specific volume parameter when provided.
+  const eud = gEUD;
   const ext = computeExtendedPhysicalMetrics(sortedDVH);
 
   return {
@@ -368,31 +377,30 @@ export function calculateDoseMetrics(dvh: DVHPoint[]): DoseMetrics {
 }
 
 /**
- * Linear interpolation helper function
+ * Dose D such that the fraction of volume receiving >= D equals `targetFrac`.
+ * `doses` ascending; `cumFrac[i]` = fraction of volume receiving >= doses[i]
+ * (monotonically non-increasing). Linear interpolation in dose.
  */
-function interpolate(x: number[], y: number[], xi: number): number {
-  if (x.length < 2) return 0;
+function doseAtCumulativeFraction(
+  doses: number[],
+  cumFrac: number[],
+  targetFrac: number
+): number {
+  if (doses.length === 0) return 0;
+  if (targetFrac >= cumFrac[0]) return doses[0];
+  const last = doses.length - 1;
+  if (targetFrac <= cumFrac[last]) return doses[last];
 
-  // Find the two points to interpolate between
-  let idx = 0;
-  while (idx < x.length - 1 && x[idx + 1] < xi) {
-    idx++;
+  for (let i = 0; i < last; i++) {
+    const fHi = cumFrac[i]; // at lower dose
+    const fLo = cumFrac[i + 1]; // at higher dose
+    if (fHi >= targetFrac && fLo <= targetFrac) {
+      if (fHi === fLo) return doses[i + 1];
+      const t = (fHi - targetFrac) / (fHi - fLo);
+      return doses[i] + t * (doses[i + 1] - doses[i]);
+    }
   }
-
-  if (idx === x.length - 1) {
-    return y[idx];
-  }
-
-  const x0 = x[idx];
-  const x1 = x[idx + 1];
-  const y0 = y[idx];
-  const y1 = y[idx + 1];
-
-  if (x1 === x0) {
-    return y0;
-  }
-
-  return y0 + ((xi - x0) / (x1 - x0)) * (y1 - y0);
+  return doses[last];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -460,26 +468,32 @@ export function calculateNTCP_LKB_Probit(
 }
 
 /**
- * Calculate NTCP using Poisson model
- * NTCP = 1 - exp(-λ × (D / D50)^γ)
- * 
- * Reference: Niemierko A. A generalized concept of equivalent uniform dose (EUD). 
- * Med Phys. 1999;26(6):1100.
+ * Calculate NTCP using the Poisson-form model
+ * NTCP = 1 - exp(-ln2 × (D / D50)^γ)
+ *
+ * v1.2.0 fix (S2): the hazard coefficient is fixed at ln 2 so that D50 is the
+ * true 50%-complication dose (NTCP(D50) = 0.5 for any γ). The previous form
+ * 1 - exp(-s × (D/D50)^γ) only centred at 50% when s happened to equal ln 2,
+ * which the shipped parameter sets did not. The legacy seriality parameter
+ * `s` is retained in the signature for API compatibility and is no longer
+ * used by the normalized form.
+ *
+ * Note: this generic form remains a display-only comparison model and never
+ * enters composite metrics (which use the LKB logistic default).
  */
 export function calculateNTCP_Poisson(
   meanDose: number,
   d50: number,
   gamma: number,
-  s: number
+  s: number = 1
 ): number {
-  if (meanDose <= 0 || d50 <= 0 || gamma <= 0 || s <= 0) {
+  if (meanDose <= 0 || d50 <= 0 || gamma <= 0) {
     return 0;
   }
 
   try {
     const doseRatio = meanDose / d50;
-    const lambda = Math.pow(doseRatio, gamma);
-    const ntcp = 1 - Math.exp(-s * lambda);
+    const ntcp = 1 - Math.exp(-Math.LN2 * Math.pow(doseRatio, gamma));
     return Math.max(0, Math.min(1, ntcp)); // Clamp to [0, 1]
   } catch {
     return 0;
@@ -491,24 +505,47 @@ export function calculateNTCP_Poisson(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Calculate TCP using Poisson model
- * TCP = exp(-N × S(D))
- * where N = number of clonogenic cells, S(D) = survival probability at dose D
+ * Calculate TCP using the Poisson model in TCD50/γ50 parameterization.
+ *
+ *   TCP(D) = exp( −ln2 · exp( (γ50 / ln2) · (1 − D/TCD50) ) )
+ *
+ * This is the exact reparameterization of the double-exponential Poisson form
+ * TCP = exp(−N·e^(−αD)) in terms of the 50% control dose TCD50 and the
+ * normalized dose–response gradient γ50 (Okunieff et al., Int J Radiat Oncol
+ * Biol Phys 1995;32:1047–1058). It is monotone non-decreasing in dose,
+ * TCP(TCD50) = 0.5, and the slope at TCD50 equals γ50 by construction.
+ *
+ * v1.2.0 fix (S1 — critical): the previous implementation computed
+ * TCP = exp(−N·(1 − exp(−(D/D50)^γ))), which is inverted (TCP → exp(−N) ≈ 0
+ * at high dose and ≈ 1 near zero dose) and numerically degenerate with the
+ * default N = 1e9. The default composite engine path (Poisson LQ-DVH) was
+ * never affected; this corrects the generic selectable model.
+ *
+ * If `numClonogenicCells` is explicitly provided and differs from the value
+ * implied by (TCD50, γ50), the effective clonogen burden is rescaled
+ * accordingly (this shifts TCD50, as it should).
  */
 export function calculateTCP_Poisson(
   meanDose: number,
   d50: number,
   gamma: number,
-  numClonogenicCells: number = DEFAULT_CLONOGENIC_CELLS
+  numClonogenicCells?: number
 ): number {
   if (meanDose <= 0 || d50 <= 0 || gamma <= 0) {
     return 0;
   }
 
   try {
-    const doseRatio = meanDose / d50;
-    const survivalProbability = Math.exp(-Math.pow(doseRatio, gamma));
-    const tcp = Math.exp(-numClonogenicCells * (1 - survivalProbability));
+    const gammaOverLn2 = gamma / Math.LN2;
+    // Clonogen number implied by the (TCD50, γ50) pair: N0 = ln2 · exp(γ50/ln2)
+    const nImplied = Math.LN2 * Math.exp(gammaOverLn2);
+    const scale =
+      numClonogenicCells != null && numClonogenicCells > 0
+        ? numClonogenicCells / nImplied
+        : 1;
+    const u =
+      scale * Math.LN2 * Math.exp(gammaOverLn2 * (1 - meanDose / d50));
+    const tcp = Math.exp(-u);
     return Math.max(0, Math.min(1, tcp)); // Clamp to [0, 1]
   } catch {
     return 0;
@@ -583,6 +620,20 @@ export function isCumulativeDvh(dvh: DVHPoint[]): boolean {
   return true;
 }
 
+/** Differential bins → cumulative curve (volume receiving >= dose). */
+export function cumulativeFromDifferential(dvhDiff: DVHPoint[]): DVHPoint[] {
+  const sorted = [...dvhDiff].sort((a, b) => a.dose - b.dose);
+  const total = sorted.reduce((s, p) => s + Math.max(0, p.volume), 0);
+  if (total <= 0) return sorted;
+  let acc = 0;
+  const cum: DVHPoint[] = new Array(sorted.length);
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    acc += Math.max(0, sorted[i].volume);
+    cum[i] = { dose: sorted[i].dose, volume: acc };
+  }
+  return cum;
+}
+
 /** Shell volumes from a cumulative DVH (dose = minimum dose to each shell). */
 export function cumulativeShellsFromDvh(cumulative: DVHPoint[]): DVHPoint[] {
   const sorted = [...cumulative].sort((a, b) => a.dose - b.dose);
@@ -626,7 +677,8 @@ export function calculateDoseMetricsFromCumulative(cumulative: DVHPoint[]): Dose
   const minDose = positiveDoses.length > 0 ? arrayMin(positiveDoses, maxDose) : maxDose;
 
   const gEUD = calculateGEUD(shells, 1);
-  const eud = calculateEUD(meanDose, v0, 0.1);
+  // v1.2.0 fix (S3): EUD defaults to the a=1 gEUD; see calculateEUD note.
+  const eud = gEUD;
   const d98 = cumulativeDosePercentile(sorted, 98);
   const d95 = cumulativeDosePercentile(sorted, 95);
   const d50 = cumulativeDosePercentile(sorted, 50);
@@ -714,14 +766,30 @@ export function performCalculation(
   let doseMetrics = cumulative
     ? calculateDoseMetricsFromCumulative(request.dvh)
     : calculateDoseMetrics(dvhDiff);
-  if (cumulative && request.structureType === "target") {
-    const sorted = [...request.dvh].sort((a, b) => a.dose - b.dose);
+  // v1.2.0 fix (S5/S4): target coverage indices are ALWAYS evaluated against
+  // the prescription on the cumulative form of the DVH. Previously the
+  // differential-input path fell through to maxDose-relative thresholds with
+  // max-volume normalization, returning invalid V95/V100/V107.
+  if (request.structureType === "target") {
     const rx = request.prescriptionGy ?? request.totalDose;
+    const sortedForV = cumulative
+      ? [...request.dvh].sort((a, b) => a.dose - b.dose)
+      : cumulativeFromDifferential(dvhDiff);
     doseMetrics = {
       ...doseMetrics,
-      v95: volumePercentAtLeast(sorted, rx * 0.95),
-      v100: volumePercentAtLeast(sorted, rx),
-      v107: volumePercentAtLeast(sorted, rx * 1.07),
+      v95: volumePercentAtLeast(sortedForV, rx * 0.95),
+      v100: volumePercentAtLeast(sortedForV, rx),
+      v107: volumePercentAtLeast(sortedForV, rx * 1.07),
+    };
+  }
+  // v1.2.0 fix (S5): V95/V100/V107 are target-coverage indices relative to the
+  // prescription; for OARs they are meaningless, so suppress them.
+  if (request.structureType === "oar") {
+    doseMetrics = {
+      ...doseMetrics,
+      v95: undefined,
+      v100: undefined,
+      v107: undefined,
     };
   }
   if (!Number.isFinite(doseMetrics.gEUD) || doseMetrics.totalVolume <= 0) {
@@ -744,6 +812,8 @@ export function performCalculation(
   } else if (useEqd2Dvh && request.structureType === "oar") {
     doseMetrics.gEUD = calculateGEUD(gEUDInput, 1);
   }
+  // EUD is gEUD with the organ volume parameter by definition (Niemierko 1997).
+  doseMetrics.eud = doseMetrics.gEUD;
 
   const technique = getTechnique(request.technique ?? "IMRT");
   const lqMax =
@@ -793,11 +863,13 @@ export function performCalculation(
         lqMax
       );
     } else if (request.model === "poisson") {
+      // v1.2.0: N is implied by (TCD50, γ50); only an explicit user override
+      // rescales the clonogen burden (see calculateTCP_Poisson).
       tcp = calculateTCP_Poisson(
         doseMetrics.meanDose,
         params.d50,
         params.gamma,
-        request.numClonogenicCells ?? DEFAULT_CLONOGENIC_CELLS,
+        request.numClonogenicCells,
       );
     } else if (request.model === "lkb_loglogit") {
       tcp = calculateTCP_LKB(doseMetrics.gEUD, params.td50, params.gamma50);

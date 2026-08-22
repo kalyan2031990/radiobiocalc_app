@@ -1,0 +1,51 @@
+=== tsc --noEmit (2026-08-20T08:41:44Z) ===
+app/auto-demo.tsx(47,90): error TS2345: Argument of type '{}' is not assignable to parameter of type 'Record<TourStepId, "error" | "done" | "active"> | (() => Record<TourStepId, "error" | "done" | "active">)'.
+app/auto-demo.tsx(60,18): error TS2345: Argument of type '{}' is not assignable to parameter of type 'SetStateAction<Record<TourStepId, "error" | "done" | "active">>'.
+app/benchmark-comparison.tsx(356,38): error TS2339: Property 'organName' does not exist on type 'BenchmarkComparison'.
+app/benchmark-comparison.tsx(357,31): error TS2339: Property 'modelType' does not exist on type 'BenchmarkComparison'.
+components/feature-tour-host.tsx(27,50): error TS2367: This comparison appears to be unintentional because the types '1' and '0' have no overlap.
+lib/trpc.ts(34,27): error TS2345: Argument of type 'URL | RequestInfo' is not assignable to parameter of type 'string'.
+  Type 'URL' is not assignable to type 'string'.
+lib/v1.1.0-features.test.ts(34,5): error TS2741: Property 'v95Rx' is missing in type '{ prescriptionGy: number; tciPercent: number; d95: number; d98: number; d50: number; d2: number; hiIcru83: number; hiRatio: number; techniqueProfile: "conventional"; stereotacticIndicesApplicable: false; ... 5 more ...; v100Rx: number; }' but required in type 'TargetPlanIndices'.
+scripts/audit_radiobiology_full.ts(50,5): error TS2353: Object literal may only specify known properties, and 'cancerSite' does not exist in type 'PlanIndexContext'.
+scripts/audit_radiobiology_full.ts(56,5): error TS2353: Object literal may only specify known properties, and 'cancerSite' does not exist in type 'PlanIndexContext'.
+scripts/audit_radiobiology_full.ts(108,9): error TS2322: Type 'string | undefined' is not assignable to type '"target" | "oar"'.
+  Type 'undefined' is not assignable to type '"target" | "oar"'.
+scripts/mobile-app-input-suite-core.ts(238,9): error TS2322: Type 'string | undefined' is not assignable to type '"target" | "oar"'.
+  Type 'undefined' is not assignable to type '"target" | "oar"'.
+scripts/mobile-app-input-suite-core.ts(246,9): error TS2322: Type 'string | undefined' is not assignable to type '"target" | "oar"'.
+  Type 'undefined' is not assignable to type '"target" | "oar"'.
+scripts/mobile-app-input-suite-core.ts(303,9): error TS2353: Object literal may only specify known properties, and 'cancerSite' does not exist in type 'PlanIndexContext'.
+scripts/pilot-clinical-suite-core.ts(293,22): error TS18048: 'tcpOff' is possibly 'undefined'.
+scripts/pilot-clinical-suite-core.ts(294,23): error TS18048: 'ntcpOff' is possibly 'undefined'.
+scripts/pilot-feedback-form.ts(150,7): error TS2353: Object literal may only specify known properties, and 'multiline' does not exist in type 'FieldAppearanceOptions'.
+scripts/run_build18_supplementary_pipeline.ts(62,5): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(command: string, options: ExecSyncOptionsWithStringEncoding): string', gave the following error.
+    Type 'boolean' is not assignable to type 'string'.
+  Overload 2 of 4, '(command: string, options: ExecSyncOptionsWithBufferEncoding): NonSharedBuffer', gave the following error.
+    Type 'boolean' is not assignable to type 'string'.
+  Overload 3 of 4, '(command: string, options?: ExecSyncOptions | undefined): string | NonSharedBuffer', gave the following error.
+    Type 'boolean' is not assignable to type 'string'.
+scripts/run_manuscript_export.ts(422,34): error TS2551: Property 'ntcp' does not exist on type 'TherapeuticWindowResult'. Did you mean 'tcp'?
+scripts/run_manuscript_export.ts(422,64): error TS2551: Property 'ntcp' does not exist on type 'TherapeuticWindowResult'. Did you mean 'tcp'?
+scripts/run_mobile_clinical_device_smoke.ts(64,3): error TS2322: Type 'boolean | undefined' is not assignable to type 'boolean'.
+  Type 'undefined' is not assignable to type 'boolean'.
+scripts/run_multi_site_smoke.ts(156,33): error TS2552: Cannot find name 'HN_ROOT'. Did you mean 'hnRoot'?
+scripts/run_ptv_oar_clinical_test.ts(88,5): error TS2322: Type 'number | undefined' is not assignable to type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+scripts/run_ptv_oar_clinical_test.ts(96,5): error TS2322: Type 'number | undefined' is not assignable to type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+scripts/run_ptv_oar_clinical_test.ts(132,7): error TS2322: Type 'string | undefined' is not assignable to type 'boolean | undefined'.
+  Type 'string' is not assignable to type 'boolean | undefined'.
+scripts/run_ptv_oar_clinical_test.ts(138,32): error TS18048: 'adj.tcp' is possibly 'undefined'.
+scripts/run_ptv_oar_clinical_test.ts(138,70): error TS18048: 'adj.ntcp' is possibly 'undefined'.
+scripts/run_release_validation.ts(264,34): error TS2345: Argument of type '{ SKIP_APK_BUILD: string; SKIP_MOBILE_TEST: string; } | { SKIP_APK_BUILD?: undefined; SKIP_MOBILE_TEST?: undefined; }' is not assignable to parameter of type 'Record<string, string> | undefined'.
+  Type '{ SKIP_APK_BUILD?: undefined; SKIP_MOBILE_TEST?: undefined; }' is not assignable to type 'Record<string, string>'.
+    Property 'SKIP_APK_BUILD' is incompatible with index signature.
+      Type 'undefined' is not assignable to type 'string'.
+server/literature-references.ts(154,17): error TS2352: Conversion of type 'OrganParameters' to type 'Record<string, number>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'OrganParameters'.
+server/plan-dosimetric-indices.test.ts(66,5): error TS2322: Type '"bundled"' is not assignable to type 'ClinicalDataSource'.
+TSC errors total: 29
+--- errors in v1.2.0-touched files (expect none) ---
+NONE

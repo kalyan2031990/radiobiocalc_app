@@ -1,0 +1,88 @@
+{
+  "version": "1.2.0",
+  "build": 19,
+  "generatedAt": "2026-08-20T08:44:09.668Z",
+  "case": "RBX-TXT-001",
+  "composite": {
+    "ntcpCompositePct": 62.67,
+    "twiPct": 40,
+    "d95Gy": 65.23,
+    "utcpPct": 17.25,
+    "pPlusPct": 100,
+    "tcpRawPct": 100
+  },
+  "checks": [
+    {
+      "id": "R1",
+      "description": "Composite NTCP vs build-18 parity record",
+      "value": 62.67,
+      "reference": 62.7,
+      "tolerance": 0.5,
+      "pass": true
+    },
+    {
+      "id": "R2",
+      "description": "TWI = uncapped TCP − Σλ·NTCP identity; post-build-17 value 40.0",
+      "value": 40,
+      "reference": 40,
+      "tolerance": 0.01,
+      "pass": true
+    },
+    {
+      "id": "R3",
+      "description": "D95 vs build-18 parity record",
+      "value": 65.23,
+      "reference": 65.4,
+      "tolerance": 0.5,
+      "pass": true
+    },
+    {
+      "id": "S1a",
+      "description": "Generic Poisson TCP(TCD50) = 0.5",
+      "value": 0.5,
+      "reference": 0.5,
+      "tolerance": 0.000001,
+      "pass": true
+    },
+    {
+      "id": "S1b",
+      "description": "Generic Poisson TCP monotone increasing (10 Gy < 100 Gy)",
+      "value": "0.0009 < 0.9620",
+      "pass": true
+    },
+    {
+      "id": "S2a",
+      "description": "Generic Poisson NTCP(D50) = 0.5 (ln2-normalized)",
+      "value": 0.5,
+      "reference": 0.5,
+      "tolerance": 0.000001,
+      "pass": true
+    },
+    {
+      "id": "S4a",
+      "description": "Differential-path D50 (cumulative interpolation)",
+      "value": 50,
+      "reference": 50,
+      "tolerance": 0.000001,
+      "pass": true
+    },
+    {
+      "id": "S5a",
+      "description": "OAR V95/V100/V107 suppressed",
+      "value": "undefined/undefined/undefined",
+      "pass": true
+    },
+    {
+      "id": "S3a",
+      "description": "EUD equals gEUD (organ volume parameter)",
+      "value": 15,
+      "reference": 15,
+      "tolerance": 1e-9,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 9,
+    "failures": 0
+  }
+}

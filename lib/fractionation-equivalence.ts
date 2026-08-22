@@ -2,7 +2,7 @@
  * BED / EQD₂ fractionation-equivalence table with LQL damping (F6).
  */
 
-import { calculateBED, calculateEQD2 } from "@/server/radiobiology";
+import { calculateBED } from "@/server/radiobiology";
 import { calculateBED_LQL } from "@/server/advanced-models";
 
 export type FractionationCategory =
@@ -63,15 +63,24 @@ export type EquivalenceTableOptions = {
   alphaBetaLate?: number;
   useLqlDamping?: boolean;
   lqlTransitionGy?: number;
+  /**
+   * β used to split α/β into (α, β) for the LQL correction, which requires
+   * α and β separately (default 0.035 Gy⁻², mid-range for HN; Astrahan 2008).
+   * Exposed in v1.2.0 — previously hard-coded and undocumented.
+   */
+  lqlBetaGy2?: number;
   customSchedules?: FractionationSchedule[];
 };
 
 const DEFAULT_AB_TUMOR = 10;
 const DEFAULT_AB_LATE = 3;
+const DEFAULT_LQL_BETA_GY2 = 0.035;
 
-function alphaBetaToAlphaBetaRatio(alphaBeta: number): { alpha: number; beta: number } {
-  const beta = 0.035;
-  return { alpha: alphaBeta * beta, beta };
+function alphaBetaToAlphaBetaRatio(
+  alphaBeta: number,
+  betaGy2: number = DEFAULT_LQL_BETA_GY2
+): { alpha: number; beta: number } {
+  return { alpha: alphaBeta * betaGy2, beta: betaGy2 };
 }
 
 export function computeEquivalenceRow(
@@ -83,12 +92,13 @@ export function computeEquivalenceRow(
   const dpf = schedule.totalDoseGy / schedule.numFractions;
   const useLql = opts.useLqlDamping === true && dpf > 6;
   const dt = opts.lqlTransitionGy ?? 6;
+  const betaGy2 = opts.lqlBetaGy2 ?? DEFAULT_LQL_BETA_GY2;
 
   let bedTumor: number;
   let bedLate: number;
   if (useLql) {
-    const { alpha: aT, beta: bT } = alphaBetaToAlphaBetaRatio(abTumor);
-    const { alpha: aL, beta: bL } = alphaBetaToAlphaBetaRatio(abLate);
+    const { alpha: aT, beta: bT } = alphaBetaToAlphaBetaRatio(abTumor, betaGy2);
+    const { alpha: aL, beta: bL } = alphaBetaToAlphaBetaRatio(abLate, betaGy2);
     bedTumor = calculateBED_LQL(dpf, schedule.numFractions, aT, bT, 0, dt);
     bedLate = calculateBED_LQL(dpf, schedule.numFractions, aL, bL, 0, dt);
   } else {
@@ -96,8 +106,11 @@ export function computeEquivalenceRow(
     bedLate = calculateBED(schedule.totalDoseGy, schedule.numFractions, abLate);
   }
 
-  const eqd2Tumor = calculateEQD2(schedule.totalDoseGy, schedule.numFractions, abTumor);
-  const eqd2Late = calculateEQD2(schedule.totalDoseGy, schedule.numFractions, abLate);
+  // v1.2.0 fix (S6): EQD2 must derive from the SAME BED that is displayed.
+  // When LQL damping is applied, EQD2 = BED_LQL / (1 + 2/(α/β)); previously
+  // the EQD2 columns silently remained plain LQ while BED was LQL-damped.
+  const eqd2Tumor = bedTumor / (1 + 2 / abTumor);
+  const eqd2Late = bedLate / (1 + 2 / abLate);
 
   return {
     schedule,
