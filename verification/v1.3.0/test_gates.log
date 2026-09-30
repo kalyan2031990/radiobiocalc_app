@@ -1,0 +1,22 @@
+=== vitest (2026-09-30T05:09:43Z) ===
+npm notice
+npm notice New minor version of npm available! 11.6.2 -> 11.20.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.20.0
+npm notice To update run: npm install -g npm@11.20.0
+npm notice
+
+=== v1.2.0 regression ===
+
+ALL CHECKS PASSED (9/9) — artifact: verification/v1.2.0/v120_regression_results.json
+
+=== v1.3.0 uncertainty verification ===
+Per-OAR NTCP with 95% parameter-uncertainty band (RBX-TXT-001):
+PASS  LARYNX (Larynx): NTCP 62.7% [43.9–81.1] source=assumed
+PASS  Parotid (Parotid): NTCP 53.8% [46.7–62.2] source=mixed
+PASS  Spinal Cord (Spinal Cord): NTCP 0.0% [0.0–0.1] source=mixed
+PASS  TCP (logistic form, EUD 67.5 Gy, TCD50 60 Gy): 71.9% [35.8–94.2] source=assumed
+PASS  regression anchor: ntcpCompositeUnchanged
+PASS  regression anchor: twiUnchanged
+PASS  regression anchor: d95Unchanged
+
+ALL CHECKS PASSED — artifact: verification/v1.3.0/v130_uncertainty_results.json
