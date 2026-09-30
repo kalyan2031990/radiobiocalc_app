@@ -29,9 +29,9 @@ const config: ExpoConfig = {
       ? "rbGyanX Pilot"
       : env.appName,
   slug: env.appSlug,
-  version: "1.2.0",
+  version: "1.3.0",
   extra: {
-    buildNumber: 19,
+    buildNumber: 20,
     offlineBuild: isOfflineBuild,
     pilotBuild: isPilotBuild,
     eas: {
@@ -52,7 +52,7 @@ const config: ExpoConfig = {
     },
   },
   android: {
-    versionCode: 19,
+    versionCode: 20,
     adaptiveIcon: {
       backgroundColor: "#E8EEF4",
       foregroundImage: "./assets/images/android-icon-foreground.png",

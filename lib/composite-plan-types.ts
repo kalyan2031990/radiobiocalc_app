@@ -15,6 +15,8 @@ export type StructureEvalResult = {
   model: string;
   tcp?: number;
   ntcp?: number;
+  /** v1.3.0: Monte-Carlo 95% parameter-uncertainty band for the reported NTCP. */
+  ntcpUncertainty?: import("@/server/uncertainty").UncertaintyBand;
   modelProbes?: StructureModelProbe[];
   doseMetrics: {
     meanDose: number;

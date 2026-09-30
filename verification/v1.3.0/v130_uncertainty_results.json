@@ -1,0 +1,62 @@
+{
+  "version": "1.3.0",
+  "build": 20,
+  "generatedAt": "2026-09-30T05:10:22.885Z",
+  "case": "RBX-TXT-001",
+  "method": "Seeded Monte-Carlo (mulberry32, n=2000/structure) propagation of TD50/γ50 uncertainty through the LKB logistic NTCP; published TD50 CIs where available (Parotid, Spinal Cord, Lung), labelled assumed CV otherwise. Cross-checked against the delta method (tests/uncertainty.test.ts U4).",
+  "oarBands": [
+    {
+      "structure": "LARYNX",
+      "literatureOrgan": "Larynx",
+      "ntcpPct": 62.67,
+      "ci95LowPct": 43.94,
+      "ci95HighPct": 81.08,
+      "source": "assumed",
+      "nSamples": 2000,
+      "seed": 20260822,
+      "pass": true
+    },
+    {
+      "structure": "Parotid",
+      "literatureOrgan": "Parotid",
+      "ntcpPct": 53.79,
+      "ci95LowPct": 46.66,
+      "ci95HighPct": 62.22,
+      "source": "mixed",
+      "nSamples": 2000,
+      "seed": 20260822,
+      "pass": true
+    },
+    {
+      "structure": "Spinal Cord",
+      "literatureOrgan": "Spinal Cord",
+      "ntcpPct": 0,
+      "ci95LowPct": 0,
+      "ci95HighPct": 0.08,
+      "source": "mixed",
+      "nSamples": 2000,
+      "seed": 20260822,
+      "pass": true
+    }
+  ],
+  "tcpBand": {
+    "form": "lkb_loglogit",
+    "eudGy": 67.49,
+    "tcd50Gy": 60,
+    "gamma50": 2,
+    "tcpPct": 71.94,
+    "ci95LowPct": 35.82,
+    "ci95HighPct": 94.22,
+    "source": "assumed",
+    "pass": true
+  },
+  "regressionAnchors": {
+    "ntcpCompositeUnchanged": true,
+    "twiUnchanged": true,
+    "d95Unchanged": true
+  },
+  "summary": {
+    "structures": 3,
+    "failures": 0
+  }
+}

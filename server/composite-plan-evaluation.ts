@@ -19,6 +19,7 @@ import {
   type TherapeuticWindowResult,
   type OarNtcpEntry,
 } from "../lib/therapeutic-window";
+import { ntcpWithUncertainty } from "./uncertainty";
 import { resolveCancerSite } from "../lib/infer-cancer-site";
 import { inferTargetTypeFromName } from "../lib/infer-target-type";
 import { isBodyStructure, findBodyDvh } from "../lib/body-structure";
@@ -36,6 +37,8 @@ export type StructureEvalResult = {
   model: string;
   tcp?: number;
   ntcp?: number;
+  /** v1.3.0: Monte-Carlo 95% parameter-uncertainty band for the reported NTCP. */
+  ntcpUncertainty?: import("./uncertainty").UncertaintyBand;
   modelProbes?: StructureModelProbe[];
   doseMetrics: {
     meanDose: number;
@@ -168,6 +171,22 @@ export function evaluateCompositePlan(
       defaultParams,
     );
 
+    // v1.3.0: attach a Monte-Carlo 95% parameter-uncertainty band to the
+    // reported NTCP (LKB logistic default path only; additive — point
+    // estimates are unchanged).
+    const ntcpUncertainty =
+      role === "oar" &&
+      calc.ntcp != null &&
+      calc.model === "lkb_loglogit" &&
+      Number.isFinite(calc.doseMetrics.gEUD)
+        ? ntcpWithUncertainty(
+            calc.doseMetrics.gEUD,
+            defaultParams.td50,
+            defaultParams.gamma50,
+            lit,
+          )
+        : undefined;
+
     structureResults.push({
       structureName: name,
       structureType: role,
@@ -175,6 +194,7 @@ export function evaluateCompositePlan(
       model: calc.model,
       tcp: calc.tcp,
       ntcp: calc.ntcp,
+      ntcpUncertainty,
       modelProbes: probeModelsForStructure({
         dvh,
         totalDose,

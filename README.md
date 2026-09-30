@@ -7,7 +7,7 @@
 
 | | |
 |---|---|
-| **Current release** | **v1.2.0** (build 19) |
+| **Current release** | **v1.3.0** (build 20) |
 | **Package** | `com.rbgyanx.radiobiocalc` |
 | **Stack** | Expo · React Native · TypeScript |
 | **Engine** | On-device (no network required) |
@@ -16,7 +16,7 @@
 
 ---
 
-## Features (v1.2.0)
+## Features (v1.3.0)
 
 - Single-plan composite evaluation (17-case validated cohort)
 - **Plan A/B compare** with Δ metrics and DVH overlay
@@ -24,12 +24,16 @@
 - **Parameter library** (QUANTEC-oriented, citation-linked)
 - **BED / EQD₂** fractionation-equivalence table (LQL optional, LQL-consistent EQD₂)
 - PDF / DOCX export with per-calculation references
-- **v1.2.0:** scientific hardening release — corrected generic Poisson TCP/NTCP
+- **v1.3.0:** Monte-Carlo **parameter-uncertainty bands** (95%) on NTCP/TCP —
+  published CIs where available (Parotid, Spinal Cord, Lung), labelled assumed
+  uncertainties elsewhere; seeded and byte-reproducible; delta-method
+  cross-checked
+- **v1.2.0:** scientific hardening — corrected generic Poisson TCP/NTCP
   parameterizations, cumulative-convention Dxx on all paths, gEUD-based EUD,
   prescription-referenced target coverage indices, 23-test property/metamorphic
   suite and a 9-check regression gate against the frozen build-18 record
 
-See [CHANGELOG_v1.2.0.md](CHANGELOG_v1.2.0.md), [CHANGELOG_v1.1.0.md](CHANGELOG_v1.1.0.md) and [docs/RELEASE_v1.1.0-build18.md](docs/RELEASE_v1.1.0-build18.md).
+See [CHANGELOG_v1.3.0.md](CHANGELOG_v1.3.0.md), [CHANGELOG_v1.2.0.md](CHANGELOG_v1.2.0.md) and [docs/RELEASE_v1.1.0-build18.md](docs/RELEASE_v1.1.0-build18.md).
 
 ---
 
